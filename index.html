@@ -949,10 +949,19 @@ let reportingProductId = null; // id produktu, dla którego aktualnie otwarty je
 let editingProductId = null; // id produktu aktualnie edytowanego w sekcji "Zarządzaj listą" → "Twoje produkty"
 
 /* Próg głosów, po którym appka sama rozstrzyga zgłoszoną cenę: przewaga
-   ≥2 głosów 👍 nad 👎 zatwierdza nową cenę (staje się obowiązująca w
-   budżecie), przewaga ≥2 👎 nad 👍 odrzuca zgłoszenie. Do tego czasu liczy
-   się nadal stara cena, a przy produkcie widać zgłoszenie z licznikami głosów. */
-const VOTE_RESOLVE_THRESHOLD = 2;
+   ≥5 głosów 👍 nad 👎 zatwierdza nową cenę (staje się obowiązująca w
+   budżecie), przewaga ≥5 👎 nad 👍 odrzuca zgłoszenie. Do tego czasu liczy
+   się nadal stara cena, a przy produkcie widać zgłoszenie z licznikami głosów.
+   Podniesione z 2 na 5 (zgłoszenie Dawida: przy progu 2 wystarczyło, żeby
+   ktoś przez przypadek kliknął drugi głos, i cena zmieniała się z automatu).
+   To tylko dokumentacja/UI — faktyczny próg jest pilnowany PO STRONIE BAZY
+   (funkcja vote_price_report w Supabase, v_threshold), więc te dwie liczby
+   trzeba zmieniać RAZEM, żeby appka i baza się nie rozjechały. Appka nie ma
+   jak sama policzyć "ile osób w ogóle z niej korzysta" (Supabase nie zbiera
+   żadnej takiej statystyki, a to by wymagało nowego mechanizmu śledzenia),
+   więc automatyczne skalowanie progu wraz z liczbą użytkowników nie jest na
+   razie możliwe — stąd stały, ale wyraźnie wyższy próg. */
+const VOTE_RESOLVE_THRESHOLD = 5;
 
 /* Sklep tej samej sieci w promieniu 50 m od nowo dodawanego = uznajemy za
    duplikat (literówka we współrzędnych albo powtórne dodanie tego samego
@@ -969,7 +978,7 @@ const OSM_STORE_BRANDS = ['Biedronka', 'Lidl', 'Kaufland'];
    z sąsiedniej miejscowości. Appka i tak pokazuje potem odległość do
    każdego znalezionego sklepu, więc użytkownik sam oceni, czy warto tam
    jechać. */
-const OSM_STORE_SEARCH_RADIUS_KM = 15;
+const OSM_STORE_SEARCH_RADIUS_KM = 10;
 /* Darmowy, publiczny serwer Overpass (zapytania do danych OpenStreetMap) —
    appka nie ma własnego backendu ani klucza API, tak samo jak przy
    geokodowaniu adresu (patrz geocodeAddress, ten sam ekosystem OSM). */
@@ -1146,20 +1155,21 @@ function findNearbyStore(name, lat, lng, list){
    Rzuca wyjątek przy błędzie sieci/serwera/timeoutu (15 s, zapytania do
    Overpass bywają wolniejsze niż samo geokodowanie) — appka pokazuje wtedy
    czytelny komunikat, tak jak przy geocodeAddress. */
-async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
-  const radiusM = Math.round((radiusKm || OSM_STORE_SEARCH_RADIUS_KM) * 1000);
-  const brandPattern = OSM_STORE_BRANDS.join('|');
-  // node = pojedynczy punkt na mapie; szukamy sklepów (shop=supermarket lub
-  // convenience — niektóre mniejsze Biedronki/Lidle są tak oznaczone) których
-  // tag name LUB brand pasuje do jednej z szukanych sieci.
-  const query = '[out:json][timeout:20];(' +
-    'node["shop"~"supermarket|convenience"]["name"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
-    'node["shop"~"supermarket|convenience"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
-    ');out body;';
-
+/* Pojedyncza próba zapytania do Overpass — wydzielona osobno, bo
+   fetchNearbyStoresFromOSM próbuje dwukrotnie (patrz niżej): darmowy,
+   współdzielony serwer Overpass bywa niestabilny (raz odpowiada w 8 s, raz
+   w 30 s, raz w ogóle nie zdąży/zwróci 504) w sposób niezwiązany z samym
+   zapytaniem — druga próba chwilę później częściej trafia na mniej
+   obciążony węzeł i się udaje. */
+async function fetchNearbyStoresFromOSMOnce(query){
+  // Darmowy, współdzielony serwer Overpass bywa POWOLNY (sprawdzone
+  // bezpośrednio: nawet 20-30 sekund na odpowiedź to normalka, nie awaria)
+  // — limit czasu musi być wyraźnie dłuższy niż przy geokodowaniu adresu
+  // (10 s), inaczej appka przerywałaby połączenie, ZANIM serwer zdążyłby w
+  // ogóle odpowiedzieć.
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new DOMException('Przekroczono limit czasu', 'AbortError')), 15000);
+    timeoutId = setTimeout(() => reject(new DOMException('Przekroczono limit czasu', 'AbortError')), 40000);
   });
   let data;
   try {
@@ -1173,8 +1183,42 @@ async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
     ]);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     data = await res.json();
+    // Overpass czasem odpowiada HTTP 200 z pustym elements[] i komunikatem
+    // błędu w polu "remark" (np. własny timeout serwera) — bez tego
+    // sprawdzenia appka potraktowałaby to jako "0 sklepów w pobliżu"
+    // zamiast jako błąd, do tego cicho, bez żadnego komunikatu dla
+    // użytkownika (dokładnie objaw, który zgłosił Dawid).
+    if (data && data.remark) throw new Error(data.remark);
   } finally {
     clearTimeout(timeoutId);
+  }
+  return data;
+}
+
+async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
+  const radiusM = Math.round((radiusKm || OSM_STORE_SEARCH_RADIUS_KM) * 1000);
+  const brandPattern = OSM_STORE_BRANDS.join('|');
+  // node = pojedynczy punkt na mapie. Filtr "shop"="supermarket" jest TU
+  // celowo dokładnym dopasowaniem (bez regexu/"convenience") — serwer
+  // Overpass może wtedy od razu skorzystać z indeksu po wartości tagu i
+  // dopiero na tym dużo mniejszym zbiorze sprawdzać regexem name/brand.
+  // Wcześniejsza wersja (regex też na "shop", plus "convenience" — bardzo
+  // pospolity tag, np. każdy kiosk) kazała serwerowi przeglądać dużo
+  // większy zbiór punktów i regularnie kończyła się przekroczeniem czasu
+  // (sprawdzone bezpośrednio na overpass-api.de: bez tej zmiany zapytanie
+  // nie kończyło się w ogóle, z nią — udana odpowiedź w ok. 20-30 sekund).
+  const query = '[out:json][timeout:30];(' +
+    'node["shop"="supermarket"]["name"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
+    'node["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
+    ');out body;';
+
+  let data;
+  try {
+    data = await fetchNearbyStoresFromOSMOnce(query);
+  } catch (firstErr){
+    console.warn('Pierwsza próba zapytania do Overpass nie powiodła się, próbuję jeszcze raz za chwilę:', firstErr);
+    await new Promise(r => setTimeout(r, 2000));
+    data = await fetchNearbyStoresFromOSMOnce(query); // druga (ostatnia) próba — błąd stąd trafia już do wywołującego
   }
 
   const seenNodeIds = new Set();
@@ -3045,7 +3089,9 @@ function bindEvents(){
     const originalLabel = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Szukam sklepów…';
-    statusEl.textContent = 'Szukam Biedronki, Lidla i Kauflandu w pobliżu…';
+    // Darmowy serwer Overpass bywa wolny — appka uprzedza od razu, żeby
+    // 20-30 sekund oczekiwania nie wyglądało na zawieszenie się appki.
+    statusEl.textContent = 'Szukam Biedronki, Lidla i Kauflandu w pobliżu… może to potrwać nawet pół minuty (darmowy serwer OpenStreetMap bywa wolny).';
     try {
       const found = await fetchNearbyStoresFromOSM(state.home.lat, state.home.lng);
       // Zastępujemy tylko poprzednią partię source==='osm' — ręcznie dodane
