@@ -687,6 +687,14 @@ nav.tabbar{
 
   <!-- ================= DZIŚ ================= -->
   <section class="panel" data-panel="dzis">
+    <!-- Przeniesione tu z zakładki Budżet na wyraźną prośbę Dawida: "Okno
+         wygląda appki przeniósłbym może do zakładki Dziś, na samą górę? Nad
+         okno DZIS MOZESZ WYDAC". -->
+    <div class="card">
+      <h2>Wygląd appki<span class="sub">Jasny/ciemny tryb appka dobiera sama wg ustawień telefonu — tu wybierasz tylko kolorystykę</span></h2>
+      <div id="paletteChooser" class="palette-row"></div>
+    </div>
+
     <div class="hero" id="heroCard">
       <div class="eyebrow">Dziś możesz wydać</div>
       <div class="amount" id="heroAmount">— <span class="zl">zł</span></div>
@@ -711,11 +719,23 @@ nav.tabbar{
       </div>
       <div class="field"><input id="dailySpendNoteInput" type="text" placeholder="Na co? (opcjonalnie)"></div>
       <div class="hint" id="dailySpendHint"></div>
-      <div id="todaySpendList"></div>
+      <!-- Lista dzisiejszych wydatków rośnie w ciągu dnia i zajmowała dużo
+           miejsca na starcie zakładki — zgłoszone przez Dawida jako "zbyt duża
+           ilość danych". Formularz dodawania zostaje zawsze widoczny (to
+           główna akcja tej karty), zwijamy tylko samą listę już zapisanych
+           pozycji, domyślnie schowaną. -->
+      <button type="button" class="btn btn-ghost btn-block" id="toggleTodaySpendList" aria-expanded="false" aria-controls="todaySpendListBox" style="margin-top:8px;">Pokaż dzisiejsze wydatki ▾</button>
+      <div id="todaySpendListBox" hidden style="flex-direction:column; margin-top:4px;">
+        <div id="todaySpendList"></div>
+      </div>
     </div>
 
     <div class="card">
       <h2>Kalendarz wydatków<span class="sub">Kliknij dzień, żeby zobaczyć rozpisane wydatki</span></h2>
+      <div class="chip-row" id="calViewModeChips">
+        <button type="button" class="chip active" data-cal-view="month">Miesiąc</button>
+        <button type="button" class="chip" data-cal-view="week">Tydzień</button>
+      </div>
       <div class="cal-nav">
         <button type="button" class="btn btn-ghost btn-sm" id="calPrevMonth">‹</button>
         <strong id="calMonthLabel"></strong>
@@ -728,7 +748,10 @@ nav.tabbar{
 
     <div class="card">
       <h2>Ten miesiąc<span class="sub">Podsumowanie budżetu</span></h2>
-      <div id="monthSummary"></div>
+      <button type="button" class="btn btn-ghost btn-block" id="toggleMonthSummary" aria-expanded="false" aria-controls="monthSummaryBox">Pokaż podsumowanie ▾</button>
+      <div id="monthSummaryBox" hidden style="flex-direction:column; margin-top:4px;">
+        <div id="monthSummary"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -807,11 +830,6 @@ nav.tabbar{
       <button type="button" class="btn btn-ghost btn-block" id="importDataBtn">⬆️ Importuj dane z pliku</button>
       <input type="file" id="importDataInput" accept="application/json,.json" hidden>
       <div class="hint" id="importDataHint"></div>
-    </div>
-
-    <div class="card">
-      <h2>Wygląd appki<span class="sub">Jasny/ciemny tryb appka dobiera sama wg ustawień telefonu — tu wybierasz tylko kolorystykę</span></h2>
-      <div id="paletteChooser" class="palette-row"></div>
     </div>
   </section>
 
@@ -895,7 +913,10 @@ nav.tabbar{
 
     <div class="card">
       <h2>Historia bufora</h2>
-      <div id="bufferHistory"></div>
+      <button type="button" class="btn btn-ghost btn-block" id="toggleBufferHistory" aria-expanded="false" aria-controls="bufferHistoryBox">Pokaż historię ▾</button>
+      <div id="bufferHistoryBox" hidden style="flex-direction:column; margin-top:4px;">
+        <div id="bufferHistory"></div>
+      </div>
     </div>
   </section>
 
@@ -952,7 +973,7 @@ nav.tabbar{
         <div class="field">
           <label for="storeName">Sklep</label>
           <select id="storeName">
-            <option>Lidl</option><option>Biedronka</option><option>Kaufland</option><option>Dino</option><option>Aldi</option><option>Stokrotka</option><option>Inny</option>
+            <option>Lidl</option><option>Biedronka</option><option>Kaufland</option>
           </select>
         </div>
         <div class="field">
@@ -996,7 +1017,7 @@ nav.tabbar{
 
     <div class="card">
       <div class="card-head">
-        <h2>Wszystkie promocje<span class="sub">Pełna lista, wg sklepu i kategorii</span></h2>
+        <h2>Wszystkie produkty<span class="sub">Pełna lista, wg sklepu i kategorii — w promocji i w zwykłej cenie</span></h2>
         <button type="button" class="info-btn" id="productsDisclaimerInfoBtn" aria-expanded="false" aria-controls="productsDisclaimerInfoBox" aria-label="Ważne informacje o promocjach">?</button>
       </div>
       <div class="info-box" id="productsDisclaimerInfoBox" hidden></div>
@@ -1049,6 +1070,8 @@ nav.tabbar{
   <section class="panel" data-panel="przepisy">
     <div class="card">
       <h2>Przepisy<span class="sub">Dopasowane do Twoich aktualnych promocji — czego brakuje, dokupisz przy okazji zakupów</span></h2>
+      <div id="recipeCategoryFilter" class="chip-row"></div>
+      <div id="recipeStoreFilter" class="chip-row"></div>
       <div id="recipesList"></div>
     </div>
   </section>
@@ -1058,7 +1081,12 @@ nav.tabbar{
     <button class="tab" data-tab="budzet"><span class="icon">💳</span>Budżet</button>
     <button class="tab" data-tab="oszczednosci"><span class="icon">🏆</span>Cele</button>
     <button class="tab" data-tab="sklepy"><span class="icon">📍</span>Sklepy</button>
-    <button class="tab" data-tab="promocje"><span class="icon">🛒</span>Promocje</button>
+    <!-- Nazwa zakładki zmieniona z "Promocje" na "Produkty" na prośbę Dawida:
+         lista obejmuje nie tylko produkty w promocji, ale też te w zwykłej,
+         regularnej cenie — sama nazwa "Promocje" była myląca. data-tab
+         zostaje bez zmian ("promocje"), żeby nie ruszać żadnych innych
+         odwołań w kodzie/testach do tego panelu. -->
+    <button class="tab" data-tab="promocje"><span class="icon">🛒</span>Produkty</button>
     <button class="tab" data-tab="przepisy"><span class="icon">🍳</span>Przepisy</button>
   </nav>
 
@@ -1142,7 +1170,7 @@ const DEFAULT_STATE = {
                      // NIE na dobór produktów w "Co dziś kupisz", to wciąż liczy się po cenie jednostkowej)
   profile: { city: '' }, // Twoja lokalizacja (miasto) — filtruje zgłoszenia cen: appka pokazuje tylko zgłoszenia z pasującej lokalizacji (+ te bez podanej lokalizacji)
   deviceId: null, // losowy, anonimowy identyfikator TEGO urządzenia/przeglądarki — używany tylko po to, żeby Supabase wiedziało, że to Twój głos/zgłoszenie (żadnych kont, żadnych danych osobowych)
-  settings: { colorPalette: 'navy' }, // colorPalette: 'navy'|'mint'|'plum' — patrz applyColorPalette/renderPaletteChooser (karta "Wygląd appki" w Budżecie);
+  settings: { colorPalette: 'navy' }, // colorPalette: 'navy'|'mint'|'plum' — patrz applyColorPalette/renderPaletteChooser (karta "Wygląd appki" na górze zakładki Dziś);
                                        // jasny/ciemny appka i tak dobiera sama wg telefonu, wybór dotyczy tylko tego, KTÓRA z trzech palet
   achievements: { actions: { fixedCosts: false, buffer: false } },
   // actions: odznaki za JEDNORAZOWĄ czynność (dodanie kosztów stałych / bufora) — raz ustawione na true
@@ -1294,6 +1322,16 @@ const EXTRA_STORES_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-
    istnieć w giście — 404 jest traktowane jak pusta lista, nie błąd. */
 const RECIPES_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-ops/8cf40be3b051301e8ffec03f717dfdec/raw/recipes.json';
 
+/* Kategorie posiłków zgłoszone przez Dawida (punkty 6/7 kolejnego zgłoszenia):
+   "Przepisy w appce powinniśmy podzielić na kategorie: Śniadania, Obiad,
+   Podwieczorek, Kolacja" + "w panelu administratora powinniśmy mieć
+   możliwość dodania kategorii posiłku". Jedna, wspólna lista dla appki i
+   panelu administratora (patrz recipeFromFeedRow niżej i recipeCardHtml w
+   grosz-do-grosza-admin.html) — przepis bez kategorii (stare wpisy sprzed
+   tej zmiany) po prostu nie pasuje do żadnego filtra kategorii poza
+   "Wszystkie", appka się na to nie wywala. */
+const RECIPE_CATEGORIES = ['Śniadanie', 'Obiad', 'Podwieczorek', 'Kolacja'];
+
 /* Adres i klucz publiczny (anon) projektu Supabase, który trzyma WSPÓLNE
    zgłoszenia innych cen (patrz submit_price_report/vote_price_report/
    list_price_reports w bazie) — dzięki temu różni użytkownicy na różnych
@@ -1352,13 +1390,19 @@ let budgetBasketFilter = ''; // szukaj produktu w "Co dziś kupisz"
    wyszukiwanie = zaczynamy oglądanie listy od nowa), NIE przy każdym
    przerysowaniu appki (np. po dodaniu czegoś do listy zakupów), żeby już
    rozwinięta lista nie zwijała się sama z siebie. */
-const LIST_PAGE_SIZE = 10;
+const LIST_PAGE_SIZE = 5; // obniżone z 10 na wyraźną prośbę Dawida — każda lista w appce ma pokazywać 5 na start
 const LIST_PAGE_STEP = 5;
 let productsVisibleCounts = {};
 let basketVisibleCounts = {};
 let trophyHistoryVisibleCount = LIST_PAGE_SIZE; // historia miesięcy/kwartałów w "Twoje trofea"
 let nearestStoreFilter = new Set(); // puste = pokaż wszystkie sieci w "Najbliższe sklepy"
+let nearestStoresVisibleCount = LIST_PAGE_SIZE; // reset tylko przy zmianie filtra sieci, patrz handler #nearestStoreFilter
+let manageStoresVisibleCount = LIST_PAGE_SIZE; // "Zarządzaj sklepami" nie ma filtra, więc rośnie tylko przy "Wczytaj więcej"
+let todayPicksVisibleCount = LIST_PAGE_SIZE; // "Za tyle dziś kupisz" (Dziś) — bez filtra, więc też rośnie tylko przy "Wczytaj więcej"
 let expandedRecipeIds = new Set(); // które karty przepisów są rozwinięte — czysto lokalne, nieprzetrwałe (patrz renderRecipesPanel)
+let recipeCategoryFilter = ''; // '' = wszystkie kategorie, albo jedna z RECIPE_CATEGORIES
+let recipeStoreFilter = ''; // '' = wszystkie sklepy, albo jedna nazwa sklepu — ogranicza dopasowanie składników TYLKO do tego sklepu (patrz punkt 8 zgłoszenia Dawida: "co jeśli Użytkownik chce zrobić zakupy wyłącznie w Kauflandzie?")
+let recipesVisibleCount = LIST_PAGE_SIZE; // reset przy zmianie filtra kategorii/sklepu, patrz handlery #recipeCategoryFilter/#recipeStoreFilter
 let reportingProductId = null; // id produktu, dla którego aktualnie otwarty jest formularz "Zgłoś inną cenę"
 let editingProductId = null; // id produktu aktualnie edytowanego w sekcji "Zarządzaj listą" → "Twoje produkty"
 
@@ -2312,6 +2356,7 @@ function recipeFromFeedRow(row){
   return {
     id: String(row.id || uid()),
     name,
+    category: String(row.category || '').trim(), // patrz RECIPE_CATEGORIES — pusty string = bez kategorii (stare wpisy)
     servings: String(row.servings || '').trim(),
     instructions: String(row.instructions || '').trim(),
     ingredients,
@@ -2374,6 +2419,27 @@ function matchIngredientToActiveProduct(ingredientName, activeProducts){
 function effectivePromoCost(p){
   const qty = (p.promoQty && p.promoQty > 1) ? p.promoQty : 1;
   return p.price * qty;
+}
+
+/* NAPRAWIONY BUG (zgłoszony przez Dawida): "Ilość szt." w "Twojej liście
+   zakupów" to fizyczna liczba sztuk, które użytkownik faktycznie weźmie z
+   półki (patrz domyślne wyliczenie defaultQty = paidQty + freeQty przy
+   kliknięciu "+ Dodaj do listy") — przy promocji "3+3 gratis" domyślnie
+   pokazuje się więc "6 szt.". Stary kod liczył koszt jako price * qty, czyli
+   płacił za WSZYSTKIE 6 sztuk, mimo że połowa jest gratis. Właściwy koszt
+   to cena razy liczba sztuk PŁATNYCH, proporcjonalnie do tego, ile "paczek"
+   promocji (paidQty+freeQty razem) mieści się w wybranej ilości — przy
+   braku gratis (freeQty=0) wzór sprowadza się z powrotem do zwykłego
+   price*qty, więc zwykłe produkty (bez żadnej promocji "kup X, dostań Y") w
+   ogóle się nie zmieniają. */
+function shoppingListPaidUnits(p, qty){
+  const paidQty = (p.promoQty && p.promoQty > 1) ? p.promoQty : 1;
+  const freeQty = (p.freeQty && p.freeQty > 0) ? p.freeQty : 0;
+  const bundleSize = paidQty + freeQty;
+  return qty * paidQty / bundleSize;
+}
+function shoppingListRowCost(p, qty){
+  return p.price * shoppingListPaidUnits(p, qty);
 }
 
 /* Buduje drugą, mniejszą linijkę pod nazwą produktu: gramatura z ceną za
@@ -3020,13 +3086,13 @@ function renderShoppingList(){
     return;
   }
   const todayKey = todayDateKey();
-  // Ilość (qty) to osobista deklaracja "ile sztuk chcę kupić" — inna sprawa
-  // niż promoQty (minimalna ilość WYMAGANA przez sklep, żeby w ogóle dostać
-  // tę cenę promocyjną). Suma tutaj liczy się z ceny jednostkowej razy qty,
-  // bo p.price to już cena za sztukę przy tej promocji.
-  const total = items.reduce((sum, { entry, product }) => sum + product.price * entry.qty, 0);
+  // Ilość (qty) to osobista deklaracja "ile sztuk fizycznie wezmę" — przy
+  // promocjach "kup X, Y gratis" to WIĘCEJ niż liczba sztuk, za które trzeba
+  // zapłacić (patrz shoppingListRowCost powyżej — bez tego appka każe
+  // zapłacić też za darmowe sztuki, co zgłosił Dawid).
+  const total = items.reduce((sum, { entry, product }) => sum + shoppingListRowCost(product, entry.qty), 0);
   el.innerHTML = items.map(({ entry, product: p }) => {
-    const rowTotal = p.price * entry.qty;
+    const rowTotal = shoppingListRowCost(p, entry.qty);
     return '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + ' / szt.</span>' +
     promoQtyLineHtml(p) + promoMetaLine(p, todayKey) +
     '<div class="list-toggle-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
@@ -3050,13 +3116,51 @@ function renderShoppingList(){
 function renderRecipesPanel(){
   const el = document.getElementById('recipesList');
   if (!el) return;
+
+  // Filtr kategorii posiłku — pokazuje chipy tylko dla kategorii, które
+  // faktycznie występują wśród wczytanych przepisów (żeby nie kusić kliknięciem
+  // w kategorię, która i tak da pustą listę).
+  const catFilterEl = document.getElementById('recipeCategoryFilter');
+  const usedCategories = RECIPE_CATEGORIES.filter(c => state.recipes.some(r => r.category === c));
+  catFilterEl.innerHTML = (state.recipes.length && usedCategories.length)
+    ? '<button type="button" class="chip' + (recipeCategoryFilter === '' ? ' active' : '') + '" data-recipe-cat-chip="">Wszystkie</button>' +
+      usedCategories.map(c =>
+        '<button type="button" class="chip' + (recipeCategoryFilter === c ? ' active' : '') + '" data-recipe-cat-chip="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>'
+      ).join('')
+    : '';
+
+  // Filtr "tylko z jednego sklepu" — punkt 8 zgłoszenia Dawida: ogranicza
+  // PULĘ produktów branych pod uwagę przy dopasowywaniu składników, więc
+  // przepis pokaże jako dopasowane tylko te składniki, które akurat są w
+  // promocji w WYBRANYM sklepie (reszta trafia na "do dokupienia").
+  const storeFilterEl = document.getElementById('recipeStoreFilter');
+  storeFilterEl.innerHTML = state.recipes.length
+    ? '<button type="button" class="chip' + (recipeStoreFilter === '' ? ' active' : '') + '" data-recipe-store-chip="">Wszystkie sklepy</button>' +
+      OSM_STORE_BRANDS.map(name =>
+        '<button type="button" class="chip' + (recipeStoreFilter === name ? ' active' : '') + '" data-recipe-store-chip="' + escapeHtml(name) + '">' + escapeHtml(name) + '</button>'
+      ).join('')
+    : '';
+
   if (!state.recipes.length){
     el.innerHTML = '<div class="empty-state"><span class="big">🍳</span>Przepisów jeszcze nie ma — Dawid dopiero je dodaje. Zajrzyj tu ponownie za jakiś czas.</div>';
     return;
   }
+
+  const filteredRecipes = recipeCategoryFilter ? state.recipes.filter(r => r.category === recipeCategoryFilter) : state.recipes;
+  if (!filteredRecipes.length){
+    el.innerHTML = '<div class="empty-state">Brak przepisów w wybranej kategorii.</div>';
+    return;
+  }
+
   const todayKey = todayDateKey();
-  const activeProducts = state.products.filter(p => isPromoActive(p, todayKey));
-  el.innerHTML = state.recipes.map(r => {
+  const activeProducts = state.products.filter(p => isPromoActive(p, todayKey) && (!recipeStoreFilter || p.store === recipeStoreFilter));
+
+  const shown = filteredRecipes.slice(0, recipesVisibleCount);
+  const loadMoreBtn = filteredRecipes.length > shown.length
+    ? '<button type="button" class="btn btn-ghost btn-sm btn-block" data-loadmore-recipes="1">Wczytaj więcej (' + (filteredRecipes.length - shown.length) + ')</button>'
+    : '';
+
+  el.innerHTML = shown.map(r => {
     const matches = r.ingredients.map(ing => ({ ing, product: matchIngredientToActiveProduct(ing.name, activeProducts) }));
     const matchedCount = matches.filter(m => m.product).length;
     const total = matches.length;
@@ -3079,11 +3183,11 @@ function renderRecipesPanel(){
     }
     return '<div class="recipe-card">' +
       '<div class="head" data-recipe-toggle="' + r.id + '">' +
-        '<span class="name">' + escapeHtml(r.name) + '</span>' +
+        '<span class="name">' + escapeHtml(r.name) + (r.category ? ' <span class="hint">(' + escapeHtml(r.category) + ')</span>' : '') + '</span>' +
         '<span class="match-badge' + badgeCls + '">' + matchedCount + '/' + total + ' składników w promocji ' + (expanded ? '▴' : '▾') + '</span>' +
       '</div>' + body +
     '</div>';
-  }).join('');
+  }).join('') + loadMoreBtn;
 }
 
 function renderHero(){
@@ -3180,35 +3284,70 @@ function renderTodaySpendList(){
 }
 
 /* ---------------- Kalendarz wydatków (zakładka Dziś) ---------------- */
-let calendarViewMonth = todayDateKey().slice(0, 7); // 'YYYY-MM' aktualnie wyświetlanego miesiąca
+// Widok miesięczny/tygodniowy zgłoszony przez Dawida: "tutaj dałbym
+// użytkownikowi możliwość wyboru, czy chce mieć kalendarz z widokiem
+// miesięcznym, czy np. tylko tygodniowym". Zamiast osobnych zmiennych stanu
+// dla miesiąca i tygodnia trzymamy JEDNĄ "datę kotwicę" (calendarAnchorDate)
+// — dowolny dzień należący do aktualnie wyświetlanego okresu — dzięki czemu
+// przełączenie widoku w trakcie przeglądania nie "gubi" miejsca (miesięczny
+// widok pokazuje miesiąc zawierający kotwicę, tygodniowy — tydzień Pn-Nd
+// zawierający kotwicę).
+let calendarViewMode = 'month'; // 'month' | 'week'
+let calendarAnchorDate = todayDateKey(); // 'YYYY-MM-DD'
 let selectedCalendarDay = null; // 'YYYY-MM-DD' rozwiniętego dnia, albo null
+
+function mondayOfWeek(dateKey){
+  const d = new Date(dateKey + 'T00:00:00');
+  const dow = (d.getDay() + 6) % 7; // poniedziałek = 0
+  d.setDate(d.getDate() - dow);
+  return dateKeyFromDate(d);
+}
+
+function calendarCellHtml(dateKey, dayLabel){
+  const items = dailySpendItemsForDate(dateKey);
+  let cls = 'cal-cell';
+  let amountHtml = '';
+  if (items.length){
+    const diff = dailySpendAllowanceForDate(dateKey) - dailySpendTotalForDate(dateKey);
+    cls += diff >= 0 ? ' good' : ' warn';
+    const sign = diff >= 0 ? '+' : '−';
+    amountHtml = '<span class="cal-amount">' + sign + formatPLN(Math.abs(diff)).replace(' zł','') + '</span>';
+  }
+  if (dateKey === todayDateKey()) cls += ' today';
+  if (dateKey === selectedCalendarDay) cls += ' selected';
+  return '<button type="button" class="' + cls + '" data-cal-day="' + dateKey + '"><span class="cal-daynum">' + dayLabel + '</span>' + amountHtml + '</button>';
+}
 
 function renderSpendCalendar(){
   const grid = document.getElementById('spendCalendarGrid');
   const label = document.getElementById('calMonthLabel');
   const detail = document.getElementById('spendCalendarDetail');
-  const [y, m] = calendarViewMonth.split('-').map(Number);
-  const monthDate = new Date(y, m - 1, 1);
-  label.textContent = monthDate.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
-  const dim = daysInMonth(y, m - 1);
-  const leadOffset = (monthDate.getDay() + 6) % 7; // poniedziałek = 0
 
   let cells = '';
-  for (let i = 0; i < leadOffset; i++) cells += '<div class="cal-cell pad"></div>';
-  for (let day = 1; day <= dim; day++){
-    const dateKey = y + '-' + pad2(m) + '-' + pad2(day);
-    const items = dailySpendItemsForDate(dateKey);
-    let cls = 'cal-cell';
-    let amountHtml = '';
-    if (items.length){
-      const diff = dailySpendAllowanceForDate(dateKey) - dailySpendTotalForDate(dateKey);
-      cls += diff >= 0 ? ' good' : ' warn';
-      const sign = diff >= 0 ? '+' : '−';
-      amountHtml = '<span class="cal-amount">' + sign + formatPLN(Math.abs(diff)).replace(' zł','') + '</span>';
+  if (calendarViewMode === 'week'){
+    const weekStart = mondayOfWeek(calendarAnchorDate);
+    const startDate = new Date(weekStart + 'T00:00:00');
+    const endDate = new Date(startDate); endDate.setDate(endDate.getDate() + 6);
+    const sameMonth = startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear();
+    label.textContent = sameMonth
+      ? (startDate.getDate() + ' – ' + endDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' }))
+      : (startDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' }) + ' – ' + endDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' }));
+    for (let i = 0; i < 7; i++){
+      const d = new Date(startDate); d.setDate(d.getDate() + i);
+      const dateKey = dateKeyFromDate(d);
+      cells += calendarCellHtml(dateKey, d.getDate());
     }
-    if (dateKey === todayDateKey()) cls += ' today';
-    if (dateKey === selectedCalendarDay) cls += ' selected';
-    cells += '<button type="button" class="' + cls + '" data-cal-day="' + dateKey + '"><span class="cal-daynum">' + day + '</span>' + amountHtml + '</button>';
+  } else {
+    const [y, m] = calendarAnchorDate.slice(0, 7).split('-').map(Number);
+    const monthDate = new Date(y, m - 1, 1);
+    label.textContent = monthDate.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+    const dim = daysInMonth(y, m - 1);
+    const leadOffset = (monthDate.getDay() + 6) % 7; // poniedziałek = 0
+    for (let i = 0; i < leadOffset; i++) cells += '<div class="cal-cell pad"></div>';
+    for (let day = 1; day <= dim; day++){
+      const dateKey = y + '-' + pad2(m) + '-' + pad2(day);
+      cells += calendarCellHtml(dateKey, day);
+    }
   }
   grid.innerHTML = cells;
 
@@ -3279,7 +3418,7 @@ function renderTodayPicks(){
   const todayKey = todayDateKey();
   const todayBudget = effectiveDailyBudget(todayKey);
   if (!state.products.length){
-    el.innerHTML = '<div class="empty-state">Wklej listę promocji w zakładce <strong>Promocje</strong>, żeby zobaczyć propozycje.</div>';
+    el.innerHTML = '<div class="empty-state">Wklej listę produktów w zakładce <strong>Produkty</strong>, żeby zobaczyć propozycje.</div>';
     return;
   }
   if (!state.budget.income || todayBudget <= 0){
@@ -3293,15 +3432,23 @@ function renderTodayPicks(){
   for (const p of sorted){
     const cost = effectivePromoCost(p);
     if (cost <= remaining){ picks.push(p); remaining -= cost; }
-    if (picks.length >= 8) break;
+    // Dawniej twardy limit 8 pozycji — teraz zbieramy więcej (do 40), a
+    // widoczność ogranicza sama paginacja "Wczytaj więcej" niżej, żeby "Razem"
+    // u dołu dalej odzwierciedlało WSZYSTKIE pozycje mieszczące się w budżecie,
+    // nie tylko te aktualnie widoczne.
+    if (picks.length >= 40) break;
   }
   if (!picks.length){
     el.innerHTML = '<div class="empty-state">Żaden aktualny produkt z listy nie mieści się w dzisiejszym budżecie (' + formatPLN(todayBudget) + ').</div>';
     return;
   }
-  el.innerHTML = picks.map(p =>
+  const shown = picks.slice(0, todayPicksVisibleCount);
+  const loadMoreBtn = picks.length > shown.length
+    ? '<button type="button" class="btn btn-ghost btn-sm btn-block" data-loadmore-picks="1">Wczytaj więcej (' + (picks.length - shown.length) + ')</button>'
+    : '';
+  el.innerHTML = shown.map(p =>
     '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + '</span>' + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + priceReportBlockHtml(p) + '</div>'
-  ).join('') + '<div class="total-row"><span>Razem</span><span class="mono">' + formatPLN(todayBudget - remaining) + ' / ' + formatPLN(todayBudget) + '</span></div>';
+  ).join('') + loadMoreBtn + '<div class="total-row"><span>Razem</span><span class="mono">' + formatPLN(todayBudget - remaining) + ' / ' + formatPLN(todayBudget) + '</span></div>';
 }
 
 function renderBudgetPanel(){
@@ -3627,6 +3774,11 @@ function renderStoresPanel(){
 
   const visibleNearest = nearestStoreFilter.size ? withinRadius.filter(s => nearestStoreFilter.has(s.name)) : withinRadius;
 
+  // Paginacja "Najbliższe sklepy" — na start tylko LIST_PAGE_SIZE, reszta pod
+  // "Wczytaj więcej". Mapa rysuje TYLKO to, co faktycznie widać na liście
+  // (nearestShown), więc pinezki na mapie zawsze odpowiadają widocznym kartom.
+  const nearestShown = visibleNearest.slice(0, nearestStoresVisibleCount);
+
   const nearest = document.getElementById('nearestStoresList');
   if (!state.home){
     nearest.innerHTML = '<div class="empty-state">Wpisz swój adres albo współrzędne powyżej, żeby zobaczyć najbliższe sklepy.</div>';
@@ -3637,22 +3789,39 @@ function renderStoresPanel(){
   } else if (!visibleNearest.length){
     nearest.innerHTML = '<div class="empty-state">Brak sklepów pasujących do wybranego filtra.</div>';
   } else {
-    nearest.innerHTML = visibleNearest.map(s => storeRowHtml(s)).join('');
+    nearest.innerHTML = nearestShown.map(s => storeRowHtml(s)).join('') +
+      (visibleNearest.length > nearestShown.length
+        ? '<button type="button" class="btn btn-ghost btn-sm btn-block" data-loadmore-nearest="1">Wczytaj więcej (' + (visibleNearest.length - nearestShown.length) + ')</button>'
+        : '');
   }
 
+  // Paginacja "Zarządzaj sklepami" — bez filtra, więc po prostu limit + "Wczytaj więcej".
+  const manageShown = withDist.slice(0, manageStoresVisibleCount);
   const manageList = document.getElementById('storesManageList');
   manageList.innerHTML = withDist.length
-    ? withDist.map(s => storeRowHtml(s, { manage: true })).join('')
+    ? manageShown.map(s => storeRowHtml(s, { manage: true })).join('') +
+      (withDist.length > manageShown.length
+        ? '<button type="button" class="btn btn-ghost btn-sm btn-block" data-loadmore-manage="1">Wczytaj więcej (' + (withDist.length - manageShown.length) + ')</button>'
+        : '')
     : '<div class="hint">Brak dodanych sklepów.</div>';
 
-  updateStoresMap(visibleNearest);
+  updateStoresMap(nearestShown);
 }
 
-/* Kolor pinezki wg sieci — reszta (Dino, Aldi, ręcznie dodane "Inny" itd.)
-   dostaje neutralny szary, żeby appka nie musiała znać każdej możliwej sieci. */
-const STORE_CHAIN_COLORS = { 'Biedronka': '#c0392b', 'Lidl': '#1f6fd6', 'Kaufland': '#d1580a' };
-function storeChainColor(name){
-  return STORE_CHAIN_COLORS[name] || '#6b6b6b';
+/* Styl pinezki wg sieci (kolor wypełnienia + kolor obwódki) — reszta (np.
+   ręcznie wpisany/zaimportowany z Excela inny sklep) dostaje neutralny
+   szary, żeby appka nie musiała znać każdej możliwej sieci. Kaufland
+   celowo NIE dostaje własnego koloru wypełnienia: zgłoszone przez Dawida,
+   że jego wcześniejszy pomarańczowo-czerwony ('#d1580a') był na mapie zbyt
+   podobny do czerwieni Biedronki — zamiast tego Kaufland jest białą kropką
+   z czerwoną obwódką, żeby dało się go odróżnić na pierwszy rzut oka. */
+const STORE_CHAIN_STYLES = {
+  'Biedronka': { fill: '#c0392b', stroke: '#fff' },
+  'Lidl':      { fill: '#1f6fd6', stroke: '#fff' },
+  'Kaufland':  { fill: '#ffffff', stroke: '#c0392b' },
+};
+function storeChainStyle(name){
+  return STORE_CHAIN_STYLES[name] || { fill: '#6b6b6b', stroke: '#fff' };
 }
 
 let storesMapInstance = null;
@@ -3694,8 +3863,11 @@ function updateStoresMap(stores){
   }).bindPopup('📍 Twoja lokalizacja').addTo(storesMapLayer);
 
   (stores || []).forEach(s => {
+    const style = storeChainStyle(s.name);
+    // Kaufland ma grubszą obwódkę (3 zamiast 2) — przy białym wypełnieniu
+    // cieńsza obwódka byłaby na niektórych podkładach mapy słabo widoczna.
     L.circleMarker([s.lat, s.lng], {
-      radius: 7, color: '#fff', weight: 2, fillColor: storeChainColor(s.name), fillOpacity: 0.95
+      radius: 7, color: style.stroke, weight: style.fill === '#ffffff' ? 3 : 2, fillColor: style.fill, fillOpacity: 0.95
     }).bindPopup(
       '<b>' + escapeHtml(s.name) + '</b>' + (s.dist != null ? '<br>' + s.dist.toFixed(1) + ' km' : '') +
       '<br><a href="' + mapsUrl(s.lat, s.lng) + '" target="_blank" rel="noopener">Otwórz w Mapach</a>'
@@ -4124,6 +4296,34 @@ function bindEvents(){
     this.setAttribute('aria-expanded', String(!box.hidden));
   });
 
+  /* Zwijane okna zgłoszone przez Dawida ("zbyt duża ilość danych") —
+     wszystkie trzy działają identycznie jak istniejący wzorzec
+     toggleManageStores/toggleReportMissingStore: domyślnie schowane
+     (hidden), rozwijane przyciskiem "Pokaż ▾" / "Ukryj ▴". */
+  document.getElementById('toggleTodaySpendList').addEventListener('click', function(){
+    const box = document.getElementById('todaySpendListBox');
+    box.hidden = !box.hidden;
+    box.style.display = box.hidden ? '' : 'flex';
+    this.setAttribute('aria-expanded', String(!box.hidden));
+    this.textContent = box.hidden ? 'Pokaż dzisiejsze wydatki ▾' : 'Ukryj dzisiejsze wydatki ▴';
+  });
+
+  document.getElementById('toggleMonthSummary').addEventListener('click', function(){
+    const box = document.getElementById('monthSummaryBox');
+    box.hidden = !box.hidden;
+    box.style.display = box.hidden ? '' : 'flex';
+    this.setAttribute('aria-expanded', String(!box.hidden));
+    this.textContent = box.hidden ? 'Pokaż podsumowanie ▾' : 'Ukryj podsumowanie ▴';
+  });
+
+  document.getElementById('toggleBufferHistory').addEventListener('click', function(){
+    const box = document.getElementById('bufferHistoryBox');
+    box.hidden = !box.hidden;
+    box.style.display = box.hidden ? '' : 'flex';
+    this.setAttribute('aria-expanded', String(!box.hidden));
+    this.textContent = box.hidden ? 'Pokaż historię ▾' : 'Ukryj historię ▴';
+  });
+
   document.getElementById('saveDailySpend').addEventListener('click', async () => {
     const amtEl = document.getElementById('dailySpendInput');
     const noteEl = document.getElementById('dailySpendNoteInput');
@@ -4135,6 +4335,17 @@ function bindEvents(){
     state.dailySpend.log.push({ id: uid(), date: dateKey, amount, note: noteEl.value.trim(), allowance: calc.daily, ts: Date.now() });
     amtEl.value = ''; noteEl.value = '';
     renderAll();
+    // Lista jest domyślnie schowana (patrz toggleTodaySpendList), ale zaraz po
+    // zapisaniu wydatku użytkownik prawie na pewno chce zobaczyć/edytować to,
+    // co właśnie dodał — więc rozwijamy ją automatycznie tylko w tym momencie.
+    const listBox = document.getElementById('todaySpendListBox');
+    if (listBox.hidden){
+      listBox.hidden = false;
+      listBox.style.display = 'flex';
+      const toggleBtn = document.getElementById('toggleTodaySpendList');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+      toggleBtn.textContent = 'Ukryj dzisiejsze wydatki ▴';
+    }
     const total = dailySpendTotalForDate(dateKey);
     const diff = calc.daily - total;
     const projectedTomorrow = calc.daily + cumulativeAdjustmentBefore(tomorrowDateKey());
@@ -4189,15 +4400,34 @@ function bindEvents(){
   bindSpendItemDelegation(document.getElementById('spendCalendarDetail'));
 
   document.getElementById('calPrevMonth').addEventListener('click', () => {
-    const [y, m] = calendarViewMonth.split('-').map(Number);
-    const d = new Date(y, m - 2, 1); // m jest 1-indeksowane, więc m-2 cofa o miesiąc
-    calendarViewMonth = d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+    if (calendarViewMode === 'week'){
+      const d = new Date(mondayOfWeek(calendarAnchorDate) + 'T00:00:00'); d.setDate(d.getDate() - 7);
+      calendarAnchorDate = dateKeyFromDate(d);
+    } else {
+      const [y, m] = calendarAnchorDate.slice(0, 7).split('-').map(Number);
+      const d = new Date(y, m - 2, 1); // m jest 1-indeksowane, więc m-2 cofa o miesiąc
+      calendarAnchorDate = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-01';
+    }
     renderSpendCalendar();
   });
   document.getElementById('calNextMonth').addEventListener('click', () => {
-    const [y, m] = calendarViewMonth.split('-').map(Number);
-    const d = new Date(y, m, 1); // m jest 1-indeksowane, więc m = +1 miesiąc
-    calendarViewMonth = d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+    if (calendarViewMode === 'week'){
+      const d = new Date(mondayOfWeek(calendarAnchorDate) + 'T00:00:00'); d.setDate(d.getDate() + 7);
+      calendarAnchorDate = dateKeyFromDate(d);
+    } else {
+      const [y, m] = calendarAnchorDate.slice(0, 7).split('-').map(Number);
+      const d = new Date(y, m, 1); // m jest 1-indeksowane, więc m = +1 miesiąc
+      calendarAnchorDate = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-01';
+    }
+    renderSpendCalendar();
+  });
+  document.getElementById('calViewModeChips').addEventListener('click', (e) => {
+    const mode = e.target.getAttribute('data-cal-view');
+    if (!mode || mode === calendarViewMode) return;
+    calendarViewMode = mode;
+    document.querySelectorAll('#calViewModeChips [data-cal-view]').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-cal-view') === mode);
+    });
     renderSpendCalendar();
   });
   document.getElementById('spendCalendarGrid').addEventListener('click', (e) => {
@@ -4671,7 +4901,26 @@ function bindEvents(){
     if (name === '') nearestStoreFilter.clear();
     else if (nearestStoreFilter.has(name)) nearestStoreFilter.delete(name);
     else nearestStoreFilter.add(name);
+    nearestStoresVisibleCount = LIST_PAGE_SIZE; // zmiana filtra sieci -> wracamy do pierwszej strony
     renderStoresPanel();
+  });
+
+  document.getElementById('nearestStoresList').addEventListener('click', (e) => {
+    if (e.target.getAttribute('data-loadmore-nearest') === null) return;
+    nearestStoresVisibleCount += LIST_PAGE_STEP;
+    renderStoresPanel();
+  });
+
+  document.getElementById('storesManageList').addEventListener('click', (e) => {
+    if (e.target.getAttribute('data-loadmore-manage') === null) return;
+    manageStoresVisibleCount += LIST_PAGE_STEP;
+    renderStoresPanel();
+  });
+
+  document.getElementById('todayPicks').addEventListener('click', (e) => {
+    if (e.target.getAttribute('data-loadmore-picks') === null) return;
+    todayPicksVisibleCount += LIST_PAGE_STEP;
+    renderTodayPicks();
   });
 
   /* Zgłaszanie i ocenianie zgłoszonej ceny — działa identycznie w każdym
@@ -4762,6 +5011,11 @@ function bindEvents(){
   bindPriceReportDelegation(document.getElementById('recipesList')); // pozwala użyć "+ Dodaj do listy" przy dopasowanych składnikach
 
   document.getElementById('recipesList').addEventListener('click', (e) => {
+    if (e.target.getAttribute('data-loadmore-recipes') !== null){
+      recipesVisibleCount += LIST_PAGE_STEP;
+      renderRecipesPanel();
+      return;
+    }
     // Rozwijanie/zwijanie karty przepisu — ale nie wtedy, gdy kliknięcie
     // trafiło w przycisk "+ Dodaj do listy" WEWNĄTRZ już rozwiniętej karty
     // (ten klik obsługuje bindPriceReportDelegation powyżej, patrz data-list-toggle).
@@ -4771,6 +5025,22 @@ function bindEvents(){
     const id = head.getAttribute('data-recipe-toggle');
     if (expandedRecipeIds.has(id)) expandedRecipeIds.delete(id);
     else expandedRecipeIds.add(id);
+    renderRecipesPanel();
+  });
+
+  document.getElementById('recipeCategoryFilter').addEventListener('click', (e) => {
+    const cat = e.target.getAttribute('data-recipe-cat-chip');
+    if (cat === null) return;
+    recipeCategoryFilter = cat;
+    recipesVisibleCount = LIST_PAGE_SIZE; // zmiana filtra -> wracamy do pierwszej strony
+    renderRecipesPanel();
+  });
+
+  document.getElementById('recipeStoreFilter').addEventListener('click', (e) => {
+    const name = e.target.getAttribute('data-recipe-store-chip');
+    if (name === null) return;
+    recipeStoreFilter = name;
+    recipesVisibleCount = LIST_PAGE_SIZE; // zmiana filtra -> wracamy do pierwszej strony
     renderRecipesPanel();
   });
 
@@ -4798,11 +5068,11 @@ function bindEvents(){
       const row = e.target.closest('.product-row');
       if (row){
         const rowTotalEl = row.querySelector('.mono');
-        if (rowTotalEl) rowTotalEl.textContent = formatPLN(product.price * qty);
+        if (rowTotalEl) rowTotalEl.textContent = formatPLN(shoppingListRowCost(product, qty));
       }
       const total = state.shoppingList.reduce((sum, en) => {
         const p = findProductById(en.id);
-        return sum + (p ? p.price * en.qty : 0);
+        return sum + (p ? shoppingListRowCost(p, en.qty) : 0);
       }, 0);
       const totalEl = document.querySelector('#shoppingListBox .total-row .mono');
       if (totalEl) totalEl.textContent = formatPLN(total);
