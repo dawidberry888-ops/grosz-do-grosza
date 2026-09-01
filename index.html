@@ -870,9 +870,30 @@ nav.tabbar{
     <div class="card">
       <button type="button" class="btn btn-ghost btn-block" id="toggleManageStores" aria-expanded="false" aria-controls="manageStoresBox">Zarządzaj sklepami ▾</button>
       <div id="manageStoresBox" hidden style="flex-direction:column; gap:12px; margin-top:4px;">
-        <h2 style="margin:0;">Znajdź pobliskie sklepy<span class="sub">Biedronka, Lidl i Kaufland w promieniu ok. 15 km od Twojej lokalizacji — appka szuka ich automatycznie w OpenStreetMap</span></h2>
+        <h2 style="margin:0;">Znajdź pobliskie sklepy<span class="sub">Biedronka, Lidl i Kaufland w promieniu ok. 2 km od Twojej lokalizacji — appka szuka ich automatycznie w OpenStreetMap</span></h2>
         <button class="btn btn-ghost btn-block" id="findNearbyOsmStores">Znajdź pobliskie sklepy</button>
         <div class="hint" id="osmStoresStatus"></div>
+
+        <button type="button" class="btn btn-ghost btn-block" id="toggleReportMissingStore" aria-expanded="false" aria-controls="reportMissingStoreForm">Nie widzisz swojego sklepu? Napisz do nas ▾</button>
+        <div id="reportMissingStoreForm" hidden style="flex-direction:column; gap:8px; margin-top:4px;">
+          <div class="hint">Napisz, jaki sklep i pod jakim adresem appka powinna widzieć, a sprawdzimy to i dopiszemy — pojawi się wtedy automatycznie też u innych użytkowników appki, nie tylko u Ciebie.</div>
+          <div class="field">
+            <label for="missingStoreName">Sklep</label>
+            <select id="missingStoreName">
+              <option>Biedronka</option><option>Lidl</option><option>Kaufland</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="missingStoreAddress">Adres tego sklepu</label>
+            <input id="missingStoreAddress" placeholder="np. ul. Żupnicza 15, Warszawa">
+          </div>
+          <div class="field">
+            <label for="missingStoreNote">Dodatkowa notatka (opcjonalnie)</label>
+            <input id="missingStoreNote" placeholder="np. sklep jest w galerii handlowej">
+          </div>
+          <button type="button" class="btn btn-primary btn-block" id="submitMissingStoreReport">Wyślij zgłoszenie</button>
+          <div class="hint" id="missingStoreReportStatus"></div>
+        </div>
 
         <h2 style="margin:0;">Dodaj sklep ręcznie<span class="sub">To Twoja własna, prywatna lista — widoczna tylko na tym urządzeniu, nikt inny jej nie zobaczy ani nie zmieni</span></h2>
         <div id="storesManageList"></div>
@@ -1152,6 +1173,21 @@ function renderPaletteChooser(){
    blokuje takie połączenia) — działa w zwykłym pliku i będzie działać w
    docelowej appce mobilnej. */
 const REMOTE_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-ops/8cf40be3b051301e8ffec03f717dfdec/raw/gistfile1.txt';
+
+/* Drugi plik w TYM SAMYM giście co promocje — lista sklepów, których appka
+   NIE znajduje sama w OpenStreetMap (zła/brakująca etykieta w OSM, albo
+   po prostu poza 2 km promieniem wyszukiwania), a które Dawid ręcznie
+   zweryfikował i dopisał z poziomu panelu administracyjnego (patrz "Nie
+   widzisz swojego sklepu? Napisz do nas" w appce -> zgłoszenie trafia do
+   Supabase -> Dawid sprawdza adres -> po weryfikacji dopisuje sklep tutaj).
+   Appka pobiera tę listę cicho przy każdym otwarciu (patrz fetchExtraStoresFeed,
+   wywoływane tak samo jak fetchRemoteFeed) i scala ją z wynikami OSM oraz
+   sklepami dodanymi ręcznie przez użytkownika — dzięki temu jeden zgłoszony
+   i zweryfikowany sklep pojawia się automatycznie u WSZYSTKICH użytkowników,
+   bez potrzeby aktualizacji appki. Plik może jeszcze nie istnieć w giście
+   (dopóki Dawid nie zapisze pierwszej pozycji w panelu) — 404 jest wtedy
+   traktowane tak samo jak "lista pusta", nie jak błąd. */
+const EXTRA_STORES_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-ops/8cf40be3b051301e8ffec03f717dfdec/raw/extra-stores.json';
 
 /* Adres i klucz publiczny (anon) projektu Supabase, który trzyma WSPÓLNE
    zgłoszenia innych cen (patrz submit_price_report/vote_price_report/
@@ -2050,6 +2086,58 @@ async function fetchRemoteFeed(opts){
   }
 }
 
+/* Zamienia jeden wiersz z EXTRA_STORES_FEED_URL (sklepy dopisane ręcznie
+   przez Dawida z panelu administracyjnego, patrz EXTRA_STORES_FEED_URL)
+   na obiekt sklepu w takim samym kształcie, jaki appka trzyma wewnętrznie
+   (patrz fetchNearbyStoresFromOSM). Wiersz bez nazwy albo z nieprawidłowymi
+   współrzędnymi jest pomijany, żeby jeden zepsuty wpis nie wywalił reszty. */
+function storeFromExtraFeedRow(row){
+  if (!row || typeof row !== 'object') return null;
+  const name = String(row.name || '').trim();
+  const lat = Number(row.lat);
+  const lng = Number(row.lng);
+  if (!name || !isFinite(lat) || !isFinite(lng)) return null;
+  return { id: uid(), name, lat, lng, source: 'admin' };
+}
+
+/* Pobiera sklepy dopisane ręcznie przez Dawida (patrz EXTRA_STORES_FEED_URL)
+   i ŁĄCZY je z katalogiem sklepów — dokładnie tak samo jak
+   fetchNearbyStoresFromOSM: zastępuje TYLKO poprzednio pobraną partię
+   source==='admin', a sklepy z OSM i dodane ręcznie przez użytkownika
+   zostają nietknięte. Wywoływana cicho przy każdym otwarciu appki (patrz
+   init na dole pliku) — błąd (w tym brak pliku w giście, dopóki Dawid nic
+   jeszcze nie zapisał) jest celowo cichy, tak samo jak przy fetchRemoteFeed
+   w trybie silent. */
+async function fetchExtraStoresFeed(opts){
+  const silent = !!(opts && opts.silent);
+  if (!EXTRA_STORES_FEED_URL) return;
+  try {
+    const res = await fetch(EXTRA_STORES_FEED_URL, { cache: 'no-store' });
+    // 404 = Dawid nie zapisał jeszcze żadnego sklepu w panelu — to normalny
+    // stan (nie błąd), traktujemy go jak pustą listę.
+    if (res.status === 404) return;
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    const rows = Array.isArray(json && json.stores) ? json.stores : [];
+    const parsed = rows.map(storeFromExtraFeedRow).filter(Boolean);
+    const keepStores = state.stores.filter(s => s.source !== 'admin');
+    const accepted = [];
+    for (const f of parsed){
+      if (findNearbyStore(f.name, f.lat, f.lng, keepStores.concat(accepted))) continue;
+      accepted.push(f);
+    }
+    state.stores = keepStores.concat(accepted);
+    renderAll();
+    if (silent) {
+      try { localStorage.setItem('groszDoGroszaState', JSON.stringify(state)); } catch(e){}
+    } else {
+      await persist();
+    }
+  } catch(err){
+    console.error('Nie udało się pobrać dodatkowych sklepów od administratora:', err);
+  }
+}
+
 /* Niektóre promocje mają warunek "cena X zł, ale przy zakupie N sztuk"
    (np. serek wiejski 1,99 zł przy zakupie dwóch) — sama cena jednostkowa
    bez tej informacji byłaby myląca. p.promoQty to wymagana liczba sztuk
@@ -2232,6 +2320,29 @@ async function submitPriceReport(product, price, location){
   }
 }
 
+/* Wysyła zgłoszenie "nie widzę swojego sklepu" do Supabase (patrz "Nie
+   widzisz swojego sklepu? Napisz do nas" w zakładce Sklepy) — trafia do
+   panelu administracyjnego Dawida (missing_store_reports), gdzie po
+   ręcznej weryfikacji adresu sklep zostaje dopisany do EXTRA_STORES_FEED_URL
+   i pojawia się automatycznie u wszystkich użytkowników. Zwraca
+   {ok, message?}, dokładnie jak submitPriceReport. */
+async function submitMissingStoreReport(storeName, addressText, note){
+  if (!supabaseClient){
+    return { ok: false, message: 'Zgłaszanie sklepów wymaga appki z dostępem do sieci — otwórz zwykły plik appki albo wersję wystawioną na GitHub Pages.' };
+  }
+  try {
+    const { error } = await supabaseClient.rpc('submit_missing_store_report', {
+      p_store_name: storeName, p_address_text: addressText,
+      p_note: note || null, p_device_id: state.deviceId,
+    });
+    if (error) throw error;
+    return { ok: true };
+  } catch(err){
+    console.error('Nie udało się wysłać zgłoszenia brakującego sklepu:', err);
+    return { ok: false, message: 'Nie udało się wysłać zgłoszenia (brak połączenia?). Spróbuj ponownie za chwilę.' };
+  }
+}
+
 /* Głosuje (albo cofa własny głos, gdy klika się drugi raz w to samo) na
    jedno zgłoszenie. Gdy baza rozstrzygnie zgłoszenie (przewaga ≥2 głosów w
    jedną stronę), aktualizuje TU I TERAZ cenę wszystkich lokalnych pozycji
@@ -2337,8 +2448,23 @@ function dailySpendTotalForDate(dateKey){
    późniejsza zmiana budżetu nie przeliczała wstecz już zapisanych dni.
    Dla całego dnia bierzemy wartość z jego pierwszej (chronologicznie)
    pozycji — to ona odzwierciedlała plan na ten dzień w chwili, gdy
-   użytkownik zaczął go zapisywać. */
+   użytkownik zaczął go zapisywać.
+
+   WYJĄTEK: dla DZISIAJ appka zawsze liczy tę kwotę na żywo (dokładnie tak
+   samo jak effectiveDailyBudget/hero na "Dziś"), zamiast brać zamrożony
+   zapis sprzed chwili — zgłoszone przez Dawida: dopisanie nowego kosztu
+   stałego w Budżecie od razu zmieniało "Dziś możesz wydać" w hero (98 zł
+   zamiast 100 zł), ale kalendarz i podpowiedź pod "Ile dziś wydałeś?"
+   nadal pokazywały starą kwotę (100 zł), bo czytały zamrożony zapis z
+   PIERWSZEGO dzisiejszego wpisu. Dziś dzień jest wciąż "w toku" — dopóki
+   się nie skończy, każda zmiana budżetu powinna być widoczna wszędzie,
+   spójnie. Gdy dzień minie i przestanie być "dziś", ponownie zacznie
+   korzystać z zamrożonego zapisu (już utrwalonej historii) — zamrażanie
+   dotyczy tylko dni, które faktycznie się skończyły. */
 function dailySpendAllowanceForDate(dateKey){
+  if (dateKey === todayDateKey()){
+    return computeBudget().daily + cumulativeAdjustmentBefore(dateKey);
+  }
   const items = dailySpendItemsForDate(dateKey);
   return items.length ? items[0].allowance : null;
 }
@@ -3845,6 +3971,31 @@ function bindEvents(){
     }
   });
 
+  document.getElementById('toggleReportMissingStore').addEventListener('click', function(){
+    const box = document.getElementById('reportMissingStoreForm');
+    box.hidden = !box.hidden;
+    box.style.display = box.hidden ? '' : 'flex';
+    this.setAttribute('aria-expanded', String(!box.hidden));
+    this.textContent = box.hidden ? 'Nie widzisz swojego sklepu? Napisz do nas ▾' : 'Nie widzisz swojego sklepu? Napisz do nas ▴';
+  });
+
+  document.getElementById('submitMissingStoreReport').addEventListener('click', async () => {
+    const storeName = document.getElementById('missingStoreName').value;
+    const address = document.getElementById('missingStoreAddress').value.trim();
+    const note = document.getElementById('missingStoreNote').value.trim();
+    const statusEl = document.getElementById('missingStoreReportStatus');
+    if (!address){ statusEl.textContent = 'Podaj adres sklepu.'; return; }
+    const btn = document.getElementById('submitMissingStoreReport');
+    btn.disabled = true;
+    statusEl.textContent = 'Wysyłam…';
+    const result = await submitMissingStoreReport(storeName, address, note);
+    btn.disabled = false;
+    if (!result.ok){ statusEl.textContent = result.message; return; }
+    statusEl.textContent = 'Wysłano! Sprawdzimy adres i dopiszemy sklep, jeśli się zgadza — pojawi się automatycznie w appce.';
+    document.getElementById('missingStoreAddress').value = '';
+    document.getElementById('missingStoreNote').value = '';
+  });
+
   document.getElementById('addStore').addEventListener('click', async () => {
     const name = document.getElementById('storeName').value;
     const raw = document.getElementById('storeCoords').value.trim();
@@ -4330,6 +4481,7 @@ switchTab('dzis');
 bindEvents();
 initArtifactCapability(); // celowo bez await — pasek prywatności dogania się, gdy odpowiedź nadejdzie
 fetchRemoteFeed({ silent: true }); // celowo bez await i bez persist() — patrz komentarz przy fetchRemoteFeed
+fetchExtraStoresFeed({ silent: true }); // celowo bez await — dociąga sklepy dopisane ręcznie przez Dawida, gdy tylko odpowiedzą
 fetchPriceReports({ silent: true }); // celowo bez await — dociąga wspólne zgłoszenia cen z Supabase, gdy tylko odpowiedzą
 
 })();
