@@ -461,6 +461,23 @@ button.btn-sm{padding:7px 10px; font-size:12px; border-radius:9px;}
 .product-row .pmeta .expiring-soon{color:var(--warn); font-weight:700;}
 .product-row .promo-qty-line{flex-basis:100%; font-size:12px; font-weight:600; color:var(--warn); margin-top:1px;}
 
+/* karty przepisów (zakładka Przepisy) — patrz renderRecipesPanel */
+.recipe-card{border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;}
+.recipe-card .head{display:flex; justify-content:space-between; align-items:center; gap:10px; cursor:pointer;}
+.recipe-card .head .name{font-weight:600; font-size:14px;}
+.recipe-card .match-badge{font-size:11.5px; color:var(--ink-soft); white-space:nowrap; font-family:'JetBrains Mono',monospace;}
+.recipe-card .match-badge.full{color:var(--growth); font-weight:700;}
+.recipe-card .body{display:flex; flex-direction:column; gap:10px;}
+.recipe-card .servings{font-size:12px; color:var(--ink-faint);}
+.recipe-card .instructions{font-size:13px; line-height:1.6; white-space:pre-wrap;}
+.recipe-card .ingredients-title{font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-top:2px;}
+.missing-ingredient{
+  display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  padding:6px 2px; border-bottom:1px dashed var(--line); font-size:13px; color:var(--ink-faint);
+}
+.missing-ingredient:last-child{border-bottom:none;}
+.missing-ingredient .buy-tag{font-size:11px; color:var(--warn); white-space:nowrap;}
+
 /* ============ KALENDARZ WYDATKÓW (Dziś) ============ */
 .cal-nav{display:flex; align-items:center; justify-content:space-between;}
 .cal-nav strong{font-family:'Fraunces', serif; font-size:15px; text-transform:capitalize;}
@@ -1029,12 +1046,20 @@ nav.tabbar{
     </div>
   </section>
 
+  <section class="panel" data-panel="przepisy">
+    <div class="card">
+      <h2>Przepisy<span class="sub">Dopasowane do Twoich aktualnych promocji — czego brakuje, dokupisz przy okazji zakupów</span></h2>
+      <div id="recipesList"></div>
+    </div>
+  </section>
+
   <nav class="tabbar">
     <button class="tab" data-tab="dzis"><span class="icon">🏠</span>Dziś</button>
     <button class="tab" data-tab="budzet"><span class="icon">💳</span>Budżet</button>
     <button class="tab" data-tab="oszczednosci"><span class="icon">🏆</span>Cele</button>
     <button class="tab" data-tab="sklepy"><span class="icon">📍</span>Sklepy</button>
     <button class="tab" data-tab="promocje"><span class="icon">🛒</span>Promocje</button>
+    <button class="tab" data-tab="przepisy"><span class="icon">🍳</span>Przepisy</button>
   </nav>
 
   <button type="button" id="contactBubbleBtn" aria-expanded="false" aria-controls="contactBubblePanel" title="Masz pytania, sugestie, wątpliwości? Napisz do nas.">💬</button>
@@ -1106,6 +1131,11 @@ const DEFAULT_STATE = {
                 //   dopasowywane po name+store), nie osobno na każdym produkcie,
                 //   source:'manual'|'remote' — skąd wzięła się pozycja; przy pobieraniu z REMOTE_FEED_URL zastępowana
                 //   jest tylko poprzednia partia source==='remote', więc ręczne/importowane pozycje nie znikają}]
+  recipes: [], // [{id, name, servings, instructions, ingredients:[{name, amount}]}, ...] — przepisy dopisane
+               // przez Dawida z panelu administratora (RECIPES_FEED_URL), pobierane cicho przy każdym
+               // otwarciu (fetchRecipesFeed) i CAŁKOWICIE zastępowane przy kolejnym pobraniu (w
+               // przeciwieństwie do state.products/state.stores nie ma tu żadnego innego źródła do
+               // zachowania — to jedyna lista przepisów, użytkownik sam nic tu nie dopisuje).
   lastImport: null,
   shoppingList: [], // [{id, qty}, ...] — produkty ręcznie wybrane z "Co dziś kupisz"/"Wszystkie promocje" do własnej listy zakupów,
                      // qty: ile sztuk chce kupić (edytowalne tylko w "Twoja lista zakupów" — wpływa na sumę tam pokazaną,
@@ -1250,6 +1280,20 @@ const REMOTE_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-ops/8c
    traktowane tak samo jak "lista pusta", nie jak błąd. */
 const EXTRA_STORES_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-ops/8cf40be3b051301e8ffec03f717dfdec/raw/extra-stores.json';
 
+/* Trzeci plik w TYM SAMYM giście — przepisy dodawane przez Dawida z panelu
+   administratora (zakładka Przepisy w appce: "lista przepisów z produktów,
+   które są dostępne w appce, lub które można zrobić z części dostępnych
+   produktów, a resztę użytkownik dokupuje przy okazji zakupów" — pomysł
+   Dawida). W przeciwieństwie do EXTRA_STORES_FEED_URL appka NIE scala tego
+   z żadnym innym źródłem — to jedyna lista przepisów, więc każde pobranie
+   po prostu zastępuje całą state.recipes świeżą listą z gista (patrz
+   fetchRecipesFeed). Dopasowanie składników do promocji liczone jest na
+   bieżąco z state.products (patrz matchIngredientToActiveProduct) — appka
+   NIE trzyma dopasowań w state, żeby zawsze odzwierciedlały AKTUALNE
+   promocje, a nie te sprzed importu przepisu. Plik może jeszcze nie
+   istnieć w giście — 404 jest traktowane jak pusta lista, nie błąd. */
+const RECIPES_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-ops/8cf40be3b051301e8ffec03f717dfdec/raw/recipes.json';
+
 /* Adres i klucz publiczny (anon) projektu Supabase, który trzyma WSPÓLNE
    zgłoszenia innych cen (patrz submit_price_report/vote_price_report/
    list_price_reports w bazie) — dzięki temu różni użytkownicy na różnych
@@ -1314,6 +1358,7 @@ let productsVisibleCounts = {};
 let basketVisibleCounts = {};
 let trophyHistoryVisibleCount = LIST_PAGE_SIZE; // historia miesięcy/kwartałów w "Twoje trofea"
 let nearestStoreFilter = new Set(); // puste = pokaż wszystkie sieci w "Najbliższe sklepy"
+let expandedRecipeIds = new Set(); // które karty przepisów są rozwinięte — czysto lokalne, nieprzetrwałe (patrz renderRecipesPanel)
 let reportingProductId = null; // id produktu, dla którego aktualnie otwarty jest formularz "Zgłoś inną cenę"
 let editingProductId = null; // id produktu aktualnie edytowanego w sekcji "Zarządzaj listą" → "Twoje produkty"
 
@@ -2220,6 +2265,106 @@ async function fetchExtraStoresFeed(opts){
   }
 }
 
+/* Pobiera przepisy dopisane przez Dawida (patrz RECIPES_FEED_URL) — w
+   przeciwieństwie do fetchExtraStoresFeed/fetchNearbyStoresFromOSM nie ma
+   tu nic do scalania: to jedyne źródło przepisów, więc każde pobranie po
+   prostu ZASTĘPUJE całą state.recipes świeżą listą. Wywoływana cicho przy
+   każdym otwarciu appki (patrz init na dole pliku) — brak pliku w giście
+   (Dawid nic jeszcze nie zapisał) jest traktowany jak pusta lista, nie błąd. */
+async function fetchRecipesFeed(opts){
+  const silent = !!(opts && opts.silent);
+  if (!RECIPES_FEED_URL) return;
+  try {
+    const res = await fetch(RECIPES_FEED_URL, { cache: 'no-store' });
+    if (res.status === 404) return;
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    const rows = Array.isArray(json && json.recipes) ? json.recipes : [];
+    state.recipes = rows.map(recipeFromFeedRow).filter(Boolean);
+    renderAll();
+    if (silent) {
+      try { localStorage.setItem('groszDoGroszaState', JSON.stringify(state)); } catch(e){}
+    } else {
+      await persist();
+    }
+  } catch(err){
+    console.error('Nie udało się pobrać przepisów od administratora:', err);
+  }
+}
+
+/* Zamienia jeden wiersz z RECIPES_FEED_URL na obiekt przepisu w kształcie,
+   jaki appka trzyma wewnętrznie. Przepis bez nazwy albo bez ŻADNEGO
+   poprawnego składnika jest pomijany, żeby jeden zepsuty wpis z panelu
+   administratora nie wywalił reszty listy. */
+function recipeFromFeedRow(row){
+  if (!row || typeof row !== 'object') return null;
+  const name = String(row.name || '').trim();
+  if (!name) return null;
+  const ingredients = Array.isArray(row.ingredients)
+    ? row.ingredients.map(i => {
+        if (!i || typeof i !== 'object') return null;
+        const iname = String(i.name || '').trim();
+        if (!iname) return null;
+        return { name: iname, amount: String(i.amount || '').trim() };
+      }).filter(Boolean)
+    : [];
+  if (!ingredients.length) return null;
+  return {
+    id: String(row.id || uid()),
+    name,
+    servings: String(row.servings || '').trim(),
+    instructions: String(row.instructions || '').trim(),
+    ingredients,
+  };
+}
+
+/* Zdejmuje polskie znaki diakrytyczne i sprowadza do małych liter, żeby
+   dopasowanie nazw nie zależało od wielkości liter ani ogonków — nazwy
+   składników z panelu administratora ("pomidory", "cebula") i nazwy
+   produktów z gazetek ("Pomidory malinowe luz", "Cebula żółta 1 kg")
+   pochodzą z zupełnie różnych źródeł i nigdy nie będą pisane identycznie. */
+function normalizePL(s){
+  return String(s || '').toLowerCase()
+    .replace(/ą/g,'a').replace(/ć/g,'c').replace(/ę/g,'e').replace(/ł/g,'l')
+    .replace(/ń/g,'n').replace(/ó/g,'o').replace(/ś/g,'s').replace(/ź/g,'z').replace(/ż/g,'z')
+    .trim();
+}
+
+/* Dopasowanie "składnik przepisu" <-> "nazwa produktu z promocji" nie może
+   wymagać identycznego tekstu — polska odmiana słów sprawia, że "kurczak"
+   w przepisie i "Filet z kurczaka" w gazetce różnią się końcówką. Zamiast
+   dokładnego porównania, appka sprawdza, czy jakieś SŁOWO z nazwy produktu
+   dzieli z nazwą składnika wspólny "rdzeń" (pierwsze do 5 znaków) — to
+   prosta, ale w praktyce wystarczająca heurystyka dla krótkich polskich
+   rzeczowników (kurczak/kurczaka/kurczaki, pomidor/pomidory, cebula/cebuli).
+   Krótsze słowa (<=3 znaki, np. "sól", "ryż") muszą zgadzać się w całości,
+   żeby uniknąć fałszywych trafień na przypadkowych, krótkich prefiksach. */
+function ingredientMatchesProduct(ingredientName, productName){
+  const stem = normalizePL(ingredientName);
+  if (!stem) return false;
+  const stemPrefix = stem.length > 5 ? stem.slice(0, 5) : stem;
+  const words = normalizePL(productName).split(/[^a-z0-9]+/).filter(Boolean);
+  return words.some(w => {
+    if (stem.length <= 3 || w.length <= 3) return w === stem;
+    const wordPrefix = w.length > 5 ? w.slice(0, 5) : w;
+    return w.startsWith(stemPrefix) || stem.startsWith(wordPrefix);
+  });
+}
+
+/* Znajduje najtańszy aktualnie aktywny produkt promocyjny pasujący do
+   danego składnika (spośród WSZYSTKICH sklepów — appka i tak pokazuje
+   nazwę sklepu przy dopasowaniu, więc użytkownik sam widzi, gdzie po niego
+   iść), albo null, jeśli żaden aktywny produkt nie pasuje — wtedy składnik
+   trafia na listę "do dokupienia" (patrz renderRecipesPanel). */
+function matchIngredientToActiveProduct(ingredientName, activeProducts){
+  let best = null;
+  for (const p of activeProducts){
+    if (!ingredientMatchesProduct(ingredientName, p.name)) continue;
+    if (!best || p.price < best.price) best = p;
+  }
+  return best;
+}
+
 /* Niektóre promocje mają warunek "cena X zł, ale przy zakupie N sztuk"
    (np. serek wiejski 1,99 zł przy zakupie dwóch) — sama cena jednostkowa
    bez tej informacji byłaby myląca. p.promoQty to wymagana liczba sztuk
@@ -2846,6 +2991,7 @@ function renderAll(){
   renderProductsPanel();
   renderManageProductsList();
   renderShoppingList();
+  renderRecipesPanel();
   renderUserCitySetting();
   renderPaletteChooser();
 }
@@ -2890,6 +3036,54 @@ function renderShoppingList(){
     '</div>' +
     '</div>';
   }).join('') + '<div class="total-row"><span>Razem</span><span class="mono">' + formatPLN(total) + '</span></div>';
+}
+
+/* "Przepisy" — lista przepisów dodanych przez Dawida (state.recipes, patrz
+   RECIPES_FEED_URL), każdy dopasowany NA BIEŻĄCO do aktualnie aktywnych
+   promocji (state.products, patrz matchIngredientToActiveProduct). Składnik
+   dopasowany do jakiejś promocji pokazuje się jak zwykły wiersz produktu
+   (z przyciskiem "+ Dodaj do listy" — ten sam mechanizm co w "Co dziś
+   kupisz"), a niedopasowany trafia na listę "do dokupienia" jako zwykły
+   tekst, zgodnie z pomysłem Dawida: "resztę użytkownik dokupuje przy
+   potencjalnych zakupach" — appka nie udaje, że wie, gdzie kupić sól czy
+   mąkę, jeśli akurat nie ma ich w żadnej promocji. */
+function renderRecipesPanel(){
+  const el = document.getElementById('recipesList');
+  if (!el) return;
+  if (!state.recipes.length){
+    el.innerHTML = '<div class="empty-state"><span class="big">🍳</span>Przepisów jeszcze nie ma — Dawid dopiero je dodaje. Zajrzyj tu ponownie za jakiś czas.</div>';
+    return;
+  }
+  const todayKey = todayDateKey();
+  const activeProducts = state.products.filter(p => isPromoActive(p, todayKey));
+  el.innerHTML = state.recipes.map(r => {
+    const matches = r.ingredients.map(ing => ({ ing, product: matchIngredientToActiveProduct(ing.name, activeProducts) }));
+    const matchedCount = matches.filter(m => m.product).length;
+    const total = matches.length;
+    const expanded = expandedRecipeIds.has(r.id);
+    const badgeCls = matchedCount === total ? ' full' : '';
+    let body = '';
+    if (expanded){
+      const rows = matches.map(({ ing, product: p }) => {
+        if (p){
+          return '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span> · ' + escapeHtml(ing.amount) + '</span><span class="pprice">' + formatPLN(p.price) + '</span>' +
+            promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + '</div>';
+        }
+        return '<div class="missing-ingredient"><span>' + escapeHtml(ing.name) + (ing.amount ? ' <span class="hint">(' + escapeHtml(ing.amount) + ')</span>' : '') + '</span><span class="buy-tag">do dokupienia</span></div>';
+      }).join('');
+      body = '<div class="body">' +
+        (r.servings ? '<div class="servings">🍽️ ' + escapeHtml(r.servings) + '</div>' : '') +
+        '<div><div class="ingredients-title">Składniki</div>' + rows + '</div>' +
+        (r.instructions ? '<div><div class="ingredients-title">Przygotowanie</div><div class="instructions">' + escapeHtml(r.instructions) + '</div></div>' : '') +
+        '</div>';
+    }
+    return '<div class="recipe-card">' +
+      '<div class="head" data-recipe-toggle="' + r.id + '">' +
+        '<span class="name">' + escapeHtml(r.name) + '</span>' +
+        '<span class="match-badge' + badgeCls + '">' + matchedCount + '/' + total + ' składników w promocji ' + (expanded ? '▴' : '▾') + '</span>' +
+      '</div>' + body +
+    '</div>';
+  }).join('');
 }
 
 function renderHero(){
@@ -4565,6 +4759,20 @@ function bindEvents(){
   bindPriceReportDelegation(document.getElementById('todayPicks'));
   bindPriceReportDelegation(document.getElementById('budgetBasketByStore'));
   bindPriceReportDelegation(document.getElementById('productsByStore'));
+  bindPriceReportDelegation(document.getElementById('recipesList')); // pozwala użyć "+ Dodaj do listy" przy dopasowanych składnikach
+
+  document.getElementById('recipesList').addEventListener('click', (e) => {
+    // Rozwijanie/zwijanie karty przepisu — ale nie wtedy, gdy kliknięcie
+    // trafiło w przycisk "+ Dodaj do listy" WEWNĄTRZ już rozwiniętej karty
+    // (ten klik obsługuje bindPriceReportDelegation powyżej, patrz data-list-toggle).
+    if (e.target.closest('[data-list-toggle]')) return;
+    const head = e.target.closest('[data-recipe-toggle]');
+    if (!head) return;
+    const id = head.getAttribute('data-recipe-toggle');
+    if (expandedRecipeIds.has(id)) expandedRecipeIds.delete(id);
+    else expandedRecipeIds.add(id);
+    renderRecipesPanel();
+  });
 
   document.getElementById('shoppingListBox').addEventListener('click', async (e) => {
     const removeId = e.target.getAttribute('data-list-remove');
@@ -4632,6 +4840,7 @@ bindEvents();
 initArtifactCapability(); // celowo bez await — pasek prywatności dogania się, gdy odpowiedź nadejdzie
 fetchRemoteFeed({ silent: true }); // celowo bez await i bez persist() — patrz komentarz przy fetchRemoteFeed
 fetchExtraStoresFeed({ silent: true }); // celowo bez await — dociąga sklepy dopisane ręcznie przez Dawida, gdy tylko odpowiedzą
+fetchRecipesFeed({ silent: true }); // celowo bez await — dociąga przepisy dopisane przez Dawida, gdy tylko odpowiedzą
 fetchPriceReports({ silent: true }); // celowo bez await — dociąga wspólne zgłoszenia cen z Supabase, gdy tylko odpowiedzą
 
 })();
