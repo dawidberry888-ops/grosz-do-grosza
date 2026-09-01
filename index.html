@@ -441,6 +441,7 @@ button.btn-sm{padding:7px 10px; font-size:12px; border-radius:9px;}
 .store-card .head{display:flex; justify-content:space-between; align-items:center;}
 .store-card .head .name{font-weight:600; font-size:14px;}
 .store-card .dist{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft);}
+.store-card .source{font-size:11.5px; color:var(--ink-faint);}
 .store-card .actions{display:flex; gap:8px;}
 
 /* product groups */
@@ -575,6 +576,40 @@ button.btn-sm{padding:7px 10px; font-size:12px; border-radius:9px;}
   max-width:90%; text-align:center; z-index:50;
 }
 #toast.show{opacity:1; transform:translate(-50%,0);}
+
+/* dymek kontaktowy — widoczny na KAŻDEJ zakładce (dziecko #app, poza
+   sekcjami zakładek), więc odpowiedź na "napisz do nas" jest zawsze pod
+   ręką, niezależnie na której karcie jest akurat użytkownik. Pozycja tuż
+   nad paskiem zakładek (nav.tabbar ma z-index:40) — dymek i panel muszą
+   być NAD nim, żeby panel nie chował się pod paskiem. */
+#contactBubbleBtn{
+  position:fixed; right:14px; bottom:calc(76px + env(safe-area-inset-bottom));
+  width:52px; height:52px; border-radius:50%; border:none; cursor:pointer;
+  background:var(--accent); color:var(--accent-ink); font-size:22px;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow); z-index:41; transition:transform .15s;
+}
+#contactBubbleBtn:active{transform:scale(.92);}
+#contactBubblePanel{
+  position:fixed; right:14px; left:14px; margin:0 auto; max-width:360px;
+  bottom:calc(136px + env(safe-area-inset-bottom));
+  background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:16px; z-index:42;
+  display:flex; flex-direction:column; gap:10px;
+  max-height:min(420px, 60vh); overflow-y:auto;
+}
+/* UWAGA: samo "display:flex" na #contactBubblePanel wyżej ma WIĘKSZĄ
+   swoistość (selektor #id) niż domyślna reguła przeglądarki "[hidden]{
+   display:none}" (selektor atrybutu) — bez jawnego nadpisania panel
+   zostałby "display:flex" (a więc klikalny/przechwytujący zdarzenia
+   wskaźnika) nawet z ustawionym atrybutem hidden. Ten sam problem NIE
+   dotyczy innych zwijanych sekcji w appce (np. #manageStoresBox,
+   #reportMissingStoreForm) — tam "display" jest ustawiane wyłącznie z JS
+   (inline style), nigdy na sztywno w CSS na samym #id. */
+#contactBubblePanel[hidden]{display:none;}
+#contactBubblePanel .head{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+#contactBubblePanel .head p{margin:0; font-size:13.5px; line-height:1.5; color:var(--ink);}
+#contactBubblePanel .close{background:none; border:none; cursor:pointer; color:var(--ink-faint); font-size:18px; line-height:1; padding:2px 4px;}
 
 /* nav */
 nav.tabbar{
@@ -1002,6 +1037,24 @@ nav.tabbar{
     <button class="tab" data-tab="promocje"><span class="icon">🛒</span>Promocje</button>
   </nav>
 
+  <button type="button" id="contactBubbleBtn" aria-expanded="false" aria-controls="contactBubblePanel" title="Masz pytania, sugestie, wątpliwości? Napisz do nas.">💬</button>
+  <div id="contactBubblePanel" hidden>
+    <div class="head">
+      <p>Masz pytania, sugestie, wątpliwości? Napisz do nas. Chętnie odpowiemy.</p>
+      <button type="button" class="close" id="closeContactBubble" aria-label="Zamknij">✕</button>
+    </div>
+    <div class="field">
+      <label for="contactMessage">Wiadomość</label>
+      <textarea id="contactMessage" placeholder="Napisz, o co chodzi…" style="min-height:80px;"></textarea>
+    </div>
+    <div class="field">
+      <label for="contactEmail">Twój e-mail (opcjonalnie, jeśli chcesz odpowiedź)</label>
+      <input id="contactEmail" type="email" placeholder="np. jan.kowalski@przyklad.pl">
+    </div>
+    <button type="button" class="btn btn-primary btn-block" id="submitContactMessage">Wyślij</button>
+    <div class="hint" id="contactMessageStatus"></div>
+  </div>
+
   <div id="toast"></div>
 </div>
 
@@ -1034,10 +1087,18 @@ const DEFAULT_STATE = {
   dailySpend: { log: [] }, // log: [{id, date:'YYYY-MM-DD', amount, note (opcjonalny opis "na co"), allowance (bazowy budżet dnia w chwili zapisu pierwszej pozycji tego dnia), ts}] — WIELE pozycji na dzień, appka sumuje je automatycznie
   buffer: { log: [] }, // log: [{id, ts, type:'topup'|'expense', amount, note}]
   home: null,
-  stores: [], // [{id, name (sieć, np. 'Biedronka'), lat, lng, source:'manual'|'osm' — 'osm' = znaleziony
-              // automatycznie przez "Znajdź pobliskie sklepy" (OpenStreetMap); przy kolejnym wyszukiwaniu
-              // zastępowana jest tylko poprzednia partia source==='osm', ręcznie dodane sklepy nie znikają.
-              // Starsze wpisy sprzed tej funkcji nie mają pola source — traktowane jak 'manual'.}]
+  stores: [], // [{id, name (sieć, np. 'Biedronka'), lat, lng, source:'manual'|'osm'|'admin' — 'osm' = znaleziony
+              // automatycznie przez "Znajdź pobliskie sklepy" (OpenStreetMap), 'admin' = z panelu
+              // administratora Dawida (EXTRA_STORES_FEED_URL); przy kolejnym wyszukiwaniu/pobraniu
+              // zastępowana jest tylko poprzednia partia TEGO SAMEGO source, ręcznie dodane/inne
+              // sklepy nie znikają. Starsze wpisy sprzed tej funkcji nie mają pola source — traktowane jak 'manual'.}]
+  hiddenAdminStores: [], // ["nazwa|lat|lng", ...] — "odciski palca" sklepów z panelu administratora (source:'admin'),
+                         // które TEN użytkownik usunął ze swojej listy ręcznie (patrz "Usuń" w "Zarządzaj sklepami").
+                         // Bez tego fetchExtraStoresFeed przy każdym cichym odświeżeniu w tle po prostu dopisałby
+                         // usunięty sklep z powrotem (zastępuje CAŁĄ poprzednią partię 'admin' świeżą listą z
+                         // gista) — appka pamięta więc lokalnie, co ten użytkownik świadomie odrzucił, i filtruje
+                         // to z każdego kolejnego pobrania. NIE wpływa na innych użytkowników/inne urządzenia —
+                         // to czysto lokalne "ukryj mi to", nie usunięcie z gista.
   products: [], // [{id, name, store, price, category, card ('' = bez karty), validFrom/validTo:'YYYY-MM-DD'|null,
                 //   unitSize (tekst wpisany, np. '500 g'), unitGrams/unitMl:number|null — znormalizowane do porównania cena/100g,
                 //   priceReports — PRZESTARZAŁE (sprzed Supabase, trzymane tylko dla zgodności wstecznej starych
@@ -1452,6 +1513,13 @@ function geocodeErrorMessage(err){
 function osmStoreErrorMessage(err){
   console.error('Wyszukiwanie pobliskich sklepów (OSM) nie powiodło się:', err);
   if (err && err.name === 'AbortError') return 'Wyszukiwanie sklepów trwało zbyt długo. Spróbuj ponownie za chwilę.';
+  if (err && err.httpStatus === 429){
+    // Darmowy serwer Overpass ogranicza liczbę zapytań na godzinę z jednego
+    // adresu IP — appka już sama odczekała i spróbowała ponownie (patrz
+    // fetchNearbyStoresFromOSM), więc skoro nadal 429, limit trzeba
+    // przeczekać dłużej niż appka może pozwolić sobie czekać w miejscu.
+    return 'Serwer OpenStreetMap chwilowo ogranicza liczbę zapytań z Twojej sieci (zbyt wiele w krótkim czasie) — odczekaj kilka minut i spróbuj ponownie. Jeśli nadal nie działa, użyj „Nie widzisz swojego sklepu? Napisz do nas” poniżej albo dodaj sklep ręcznie.';
+  }
   const msg = (err && err.message) ? String(err.message).toLowerCase() : '';
   if (err instanceof TypeError || msg.includes('fetch') || msg.includes('network')){
     return 'Appka nie może połączyć się z usługą wyszukiwania sklepów (OpenStreetMap). Ta funkcja wymaga prawdziwego dostępu do internetu — nie zadziała w podglądzie ani w wersji hostowanej jako prywatna strona.';
@@ -1505,7 +1573,17 @@ async function fetchNearbyStoresFromOSMOnce(query){
       }),
       timeoutPromise
     ]);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok){
+      // Uwaga: sprawdzone bezpośrednio (WebSearch, dokumentacja Overpass-API
+      // na GitHubie, zgłoszenie #351 proszące autora o dodanie tego nagłówka)
+      // — overpass-api.de NIE wysyła nagłówka Retry-After przy 429, więc appka
+      // nie może na nim polegać przy ustalaniu, ile czekać. Zapamiętujemy
+      // tylko kod HTTP (błąd 429 dostaje osobny, bardziej pomocny komunikat
+      // w osmStoreErrorMessage), a odstęp między próbami zawsze liczymy sami.
+      const err = new Error('HTTP ' + res.status);
+      err.httpStatus = res.status;
+      throw err;
+    }
     data = await res.json();
     // Overpass czasem odpowiada HTTP 200 z pustym elements[] i komunikatem
     // błędu w polu "remark" (np. własny timeout serwera) — bez tego
@@ -1556,25 +1634,26 @@ async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
     'relation["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
     ');out center;';
 
-  // Próbujemy do TRZECH razy z rosnącym odczekaniem (0 s / 3 s / 8 s) —
-  // celowo WCIĄŻ ten sam serwer (patrz obszerny komentarz przy
+  // Próbujemy do TRZECH razy z rosnącym odczekaniem (domyślnie 0 s / 3 s / 8 s)
+  // — celowo WCIĄŻ ten sam serwer (patrz obszerny komentarz przy
   // OVERPASS_API_URL: sprawdzone "alternatywne" darmowe mirrory albo mają
   // problemy z CORS w przeglądarce, albo są rosyjskie i ryzykują blokadę u
   // polskiego dostawcy internetu — obie rzeczy gorsze niż po prostu
   // poczekać chwilę i spróbować ponownie tego samego, sprawdzonego serwera).
-  const RETRY_DELAYS_MS = [0, 3000, 8000];
+  const DEFAULT_RETRY_DELAYS_MS = [0, 3000, 8000];
+  const MAX_ATTEMPTS = DEFAULT_RETRY_DELAYS_MS.length;
   let data;
   let lastErr;
-  for (let i = 0; i < RETRY_DELAYS_MS.length; i++){
+  for (let i = 0; i < MAX_ATTEMPTS; i++){
     try {
-      if (RETRY_DELAYS_MS[i] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i]));
+      if (DEFAULT_RETRY_DELAYS_MS[i] > 0) await new Promise(r => setTimeout(r, DEFAULT_RETRY_DELAYS_MS[i]));
       data = await fetchNearbyStoresFromOSMOnce(query);
       lastErr = null;
       break;
     } catch (err){
       lastErr = err;
-      const more = i < RETRY_DELAYS_MS.length - 1;
-      console.warn('Próba ' + (i + 1) + '/' + RETRY_DELAYS_MS.length + ' zapytania do Overpass nie powiodła się' + (more ? ', próbuję ponownie:' : ' (ostatnia próba):'), err);
+      const more = i < MAX_ATTEMPTS - 1;
+      console.warn('Próba ' + (i + 1) + '/' + MAX_ATTEMPTS + ' zapytania do Overpass nie powiodła się' + (more ? ', próbuję ponownie za ' + Math.round(DEFAULT_RETRY_DELAYS_MS[i + 1] / 1000) + ' s:' : ' (ostatnia próba):'), err);
     }
   }
   if (lastErr) throw lastErr; // błąd z OSTATNIEJ próby trafia do wywołującego
@@ -2130,6 +2209,15 @@ function storeFromExtraFeedRow(row){
   return { id: uid(), name, lat, lng, source: 'admin' };
 }
 
+/* "Odcisk palca" sklepu z panelu administratora — używany zamiast s.id, bo
+   storeFromExtraFeedRow nadaje NOWE id przy każdym pobraniu (patrz uid()
+   powyżej), więc samo id nie przetrwałoby do kolejnego fetchExtraStoresFeed.
+   Zaokrąglenie do 4 miejsc (~11 m) wystarcza do rozpoznania "tego samego"
+   wpisu z gista między kolejnymi pobraniami. */
+function adminStoreFingerprint(s){
+  return s.name.trim().toLowerCase() + '|' + s.lat.toFixed(4) + '|' + s.lng.toFixed(4);
+}
+
 /* Pobiera sklepy dopisane ręcznie przez Dawida (patrz EXTRA_STORES_FEED_URL)
    i ŁĄCZY je z katalogiem sklepów — dokładnie tak samo jak
    fetchNearbyStoresFromOSM: zastępuje TYLKO poprzednio pobraną partię
@@ -2149,7 +2237,11 @@ async function fetchExtraStoresFeed(opts){
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
     const rows = Array.isArray(json && json.stores) ? json.stores : [];
-    const parsed = rows.map(storeFromExtraFeedRow).filter(Boolean);
+    // Pomijamy sklepy, które TEN użytkownik już świadomie usunął (patrz
+    // state.hiddenAdminStores / "Usuń" w "Zarządzaj sklepami") — inaczej
+    // to ciche, automatyczne pobranie po prostu dopisałoby je z powrotem.
+    const hidden = new Set(state.hiddenAdminStores || []);
+    const parsed = rows.map(storeFromExtraFeedRow).filter(Boolean).filter(s => !hidden.has(adminStoreFingerprint(s)));
     const keepStores = state.stores.filter(s => s.source !== 'admin');
     const accepted = [];
     for (const f of parsed){
@@ -2370,6 +2462,28 @@ async function submitMissingStoreReport(storeName, addressText, note){
   } catch(err){
     console.error('Nie udało się wysłać zgłoszenia brakującego sklepu:', err);
     return { ok: false, message: 'Nie udało się wysłać zgłoszenia (brak połączenia?). Spróbuj ponownie za chwilę.' };
+  }
+}
+
+/* Wysyła wiadomość z dymka kontaktowego ("Masz pytania, sugestie,
+   wątpliwości?") do Supabase — widoczna tylko w panelu administratora
+   (list_feedback_messages jest ZAGATOWANE kluczem administratora, w
+   odróżnieniu od otwartych list_price_reports/list_missing_store_reports,
+   bo tu może się pojawić prywatny e-mail piszącego). E-mail jest
+   opcjonalny — appka nie wymaga podania żadnych danych, żeby napisać. */
+async function submitFeedbackMessage(message, email){
+  if (!supabaseClient){
+    return { ok: false, message: 'Wysyłanie wiadomości wymaga appki z dostępem do sieci — otwórz zwykły plik appki albo wersję wystawioną na GitHub Pages.' };
+  }
+  try {
+    const { error } = await supabaseClient.rpc('submit_feedback_message', {
+      p_message: message, p_email: email || null, p_device_id: state.deviceId,
+    });
+    if (error) throw error;
+    return { ok: true };
+  } catch(err){
+    console.error('Nie udało się wysłać wiadomości:', err);
+    return { ok: false, message: 'Nie udało się wysłać wiadomości (brak połączenia?). Spróbuj ponownie za chwilę.' };
   }
 }
 
@@ -3291,6 +3405,17 @@ function renderExtraSavingsFromBuffer(){
   document.getElementById('extraSavingsTotal').textContent = formatPLN(total);
 }
 
+/* Skąd appka zna dany sklep — pokazywane tylko w "Zarządzaj sklepami"
+   (opts.manage), bo tam widać obok siebie sklepy z bardzo różnych źródeł
+   (Twoje własne, cudze zgłoszenia z panelu Dawida, automatyczne z OSM) i bez
+   tego wygląda to na przypadkowy bałagan (zgłoszone przez Dawida: sklep 7 km
+   dalej, dodany przez kogoś innego, myli się z "moimi" sklepami). */
+function storeSourceLabel(s){
+  if (s.source === 'admin') return '🌍 Zgłoszenie innego użytkownika';
+  if (s.source === 'osm') return '🗺️ Znaleziony automatycznie (OpenStreetMap)';
+  return '📍 Twój sklep'; // 'manual' albo brak pola source (wpisy sprzed tego rozróżnienia)
+}
+
 /* Wspólny wiersz sklepu — z przyciskiem "Usuń" tylko w widoku administracyjnym
    (opts.manage), żeby zwykły widok "Najbliższe sklepy" był czysto informacyjny. */
 function storeRowHtml(s, opts){
@@ -3298,6 +3423,7 @@ function storeRowHtml(s, opts){
   return '<div class="store-card">' +
       '<div class="head"><span class="name">' + escapeHtml(s.name) + '</span>' +
       '<span class="dist">' + (s.dist != null ? s.dist.toFixed(1) + ' km' : '—') + '</span></div>' +
+      (opts.manage ? '<div class="source">' + storeSourceLabel(s) + '</div>' : '') +
       '<div class="actions">' +
         '<a class="btn btn-ghost btn-sm" href="' + mapsUrl(s.lat, s.lng) + '" target="_blank" rel="noopener">Otwórz w Mapach</a>' +
         (opts.manage ? '<button class="btn btn-danger-ghost btn-sm" data-remove-store="' + s.id + '">Usuń</button>' : '') +
@@ -4026,6 +4152,32 @@ function bindEvents(){
     document.getElementById('missingStoreNote').value = '';
   });
 
+  document.getElementById('contactBubbleBtn').addEventListener('click', function(){
+    const panel = document.getElementById('contactBubblePanel');
+    panel.hidden = !panel.hidden;
+    this.setAttribute('aria-expanded', String(!panel.hidden));
+    if (!panel.hidden) document.getElementById('contactMessage').focus();
+  });
+  document.getElementById('closeContactBubble').addEventListener('click', () => {
+    document.getElementById('contactBubblePanel').hidden = true;
+    document.getElementById('contactBubbleBtn').setAttribute('aria-expanded', 'false');
+  });
+  document.getElementById('submitContactMessage').addEventListener('click', async () => {
+    const message = document.getElementById('contactMessage').value.trim();
+    const email = document.getElementById('contactEmail').value.trim();
+    const statusEl = document.getElementById('contactMessageStatus');
+    if (!message){ statusEl.textContent = 'Napisz wiadomość zanim wyślesz.'; return; }
+    const btn = document.getElementById('submitContactMessage');
+    btn.disabled = true;
+    statusEl.textContent = 'Wysyłam…';
+    const result = await submitFeedbackMessage(message, email);
+    btn.disabled = false;
+    if (!result.ok){ statusEl.textContent = result.message; return; }
+    statusEl.textContent = 'Wysłano! Dziękujemy, odpowiemy najszybciej jak się da' + (email ? ' na podany e-mail.' : '.');
+    document.getElementById('contactMessage').value = '';
+    document.getElementById('contactEmail').value = '';
+  });
+
   document.getElementById('addStore').addEventListener('click', async () => {
     const name = document.getElementById('storeName').value;
     const raw = document.getElementById('storeCoords').value.trim();
@@ -4064,9 +4216,19 @@ function bindEvents(){
   document.getElementById('storesManageList').addEventListener('click', async (e) => {
     const id = e.target.getAttribute('data-remove-store');
     if (!id) return;
+    const removed = state.stores.find(s => s.id === id);
+    // Sklep z panelu administratora (source:'admin') zapamiętujemy jako
+    // "ukryty" (patrz state.hiddenAdminStores) — inaczej kolejne ciche
+    // pobranie fetchExtraStoresFeed przy następnym otwarciu appki po prostu
+    // dopisałoby go z powrotem, a "Usuń" wyglądałoby, jakby nic nie zrobiło.
+    // To wyłącznie lokalne — NIE usuwa sklepu z gista ani u innych osób.
+    if (removed && removed.source === 'admin'){
+      const fp = adminStoreFingerprint(removed);
+      if (!state.hiddenAdminStores.includes(fp)) state.hiddenAdminStores.push(fp);
+    }
     state.stores = state.stores.filter(s => s.id !== id);
     renderAll();
-    await persist('Usunięto sklep.');
+    await persist('Usunięto sklep.' + (removed && removed.source === 'admin' ? ' (Tylko na tym urządzeniu — sklep pochodzi ze wspólnej listy panelu administratora.)' : ''));
   });
 
   document.getElementById('toggleManageStores').addEventListener('click', function(){
