@@ -1287,21 +1287,25 @@ const OSM_STORE_BRANDS = ['Biedronka', 'Lidl', 'Kaufland'];
    sklepu, więc użytkownik sam oceni, czy warto tam jechać, a w razie
    potrzeby może wyszukać ponownie po zmianie zapisanej lokalizacji. */
 const OSM_STORE_SEARCH_RADIUS_KM = 2;
-/* Darmowe, publiczne serwery Overpass (zapytania do danych OpenStreetMap) —
+/* Darmowy, publiczny serwer Overpass (zapytania do danych OpenStreetMap) —
    appka nie ma własnego backendu ani klucza API, tak samo jak przy
    geokodowaniu adresu (patrz geocodeAddress, ten sam ekosystem OSM).
-   DWA niezależne serwery (nie ten sam dwa razy!) — zgłoszone przez Dawida:
-   "Wyszukiwanie sklepów trwało zbyt długo" mimo że wcześniej działało.
-   Główny, najbardziej znany serwer (overpass-api.de) bywa okresowo
-   przeciążony/wolny, bo korzysta z niego ogromna część wszystkich narzędzi
-   opartych o OSM na świecie — ponawianie zapytania do TEGO SAMEGO
-   przeciążonego serwera rzadko pomaga. Druga próba trafia więc na
-   CAŁKOWICIE INNY, niezależny serwer (overpass.private.coffee), więc ma
-   realną szansę się udać, nawet gdy główny akurat leży/jest przeciążony. */
-const OVERPASS_MIRRORS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter'
-];
+
+   UWAGA: appka celowo NIE korzysta z żadnego "alternatywnego" darmowego
+   mirrora Overpass (np. kumi.systems/private.coffee, maps.mail.ru) jako
+   zapasowego serwera — sprawdziłem to i mirrory te albo mają udokumentowane
+   problemy z CORS (blokują wprost zapytania z przeglądarki, co u Dawida
+   objawiło się jako "Appka nie może połączyć się..." zaraz po tym, jak
+   spróbowałem to dodać — wycofane), albo (mail.ru) są rosyjskie, co niesie
+   realne ryzyko blokady przez polskiego dostawcę internetu/firewall. Jedyny
+   serwer z pewnym, sprawdzonym wsparciem CORS dla zapytań wprost z
+   przeglądarki to właśnie overpass-api.de — to na nim opiera się m.in.
+   oficjalne narzędzie overpass-turbo. Odporność na przeciążenia zapewnia
+   więc NIE inny serwer, a więcej prób z odczekaniem (patrz
+   fetchNearbyStoresFromOSM) — overpass-api.de to od środka kilka
+   fizycznych maszyn za wspólnym adresem, więc kolejna próba realnie może
+   trafić na mniej obciążoną. */
+const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter';
 
 let artifactAPI = null;
 let capabilityAttempted = false;
@@ -1474,13 +1478,15 @@ function findNearbyStore(name, lat, lng, list){
    Rzuca wyjątek przy błędzie sieci/serwera/timeoutu (15 s, zapytania do
    Overpass bywają wolniejsze niż samo geokodowanie) — appka pokazuje wtedy
    czytelny komunikat, tak jak przy geocodeAddress. */
-/* Pojedyncza próba zapytania do JEDNEGO konkretnego serwera Overpass —
-   wydzielona osobno, bo fetchNearbyStoresFromOSM próbuje po kolei KAŻDY
-   serwer z OVERPASS_MIRRORS (patrz niżej): darmowe, współdzielone serwery
-   Overpass bywają niestabilne (raz odpowiadają w 8 s, raz w 30 s, raz w
-   ogóle nie zdążą/zwrócą 504) w sposób niezwiązany z samym zapytaniem. */
-async function fetchNearbyStoresFromOSMOnce(query, url){
-  // Darmowe, współdzielone serwery Overpass bywają POWOLNE (sprawdzone
+/* Pojedyncza próba zapytania do Overpass — wydzielona osobno, bo
+   fetchNearbyStoresFromOSM próbuje kilkukrotnie z odczekaniem (patrz
+   niżej): darmowy, współdzielony serwer Overpass bywa niestabilny (raz
+   odpowiada w 8 s, raz w 30 s, raz w ogóle nie zdąży/zwróci 504) w sposób
+   niezwiązany z samym zapytaniem — kolejna próba chwilę później częściej
+   trafia na mniej obciążoną fizyczną maszynę (overpass-api.de to od środka
+   kilka serwerów za wspólnym adresem) i się udaje. */
+async function fetchNearbyStoresFromOSMOnce(query){
+  // Darmowy, współdzielony serwer Overpass bywa POWOLNY (sprawdzone
   // bezpośrednio: nawet 20-30 sekund na odpowiedź to normalka, nie awaria)
   // — limit czasu musi być wyraźnie dłuższy niż przy geokodowaniu adresu
   // (10 s), inaczej appka przerywałaby połączenie, ZANIM serwer zdążyłby w
@@ -1492,7 +1498,7 @@ async function fetchNearbyStoresFromOSMOnce(query, url){
   let data;
   try {
     const res = await Promise.race([
-      fetch(url, {
+      fetch(OVERPASS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: query
@@ -1550,22 +1556,25 @@ async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
     'relation["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
     ');out center;';
 
-  // Próbujemy PO KOLEI każdy niezależny serwer z OVERPASS_MIRRORS (patrz
-  // komentarz przy tej stałej) — jeśli pierwszy akurat jest przeciążony/leży,
-  // druga próba trafia na CAŁKOWICIE INNY serwer, więc ma realną szansę się
-  // udać, zamiast po prostu pytać ponownie ten sam przeciążony serwer.
+  // Próbujemy do TRZECH razy z rosnącym odczekaniem (0 s / 3 s / 8 s) —
+  // celowo WCIĄŻ ten sam serwer (patrz obszerny komentarz przy
+  // OVERPASS_API_URL: sprawdzone "alternatywne" darmowe mirrory albo mają
+  // problemy z CORS w przeglądarce, albo są rosyjskie i ryzykują blokadę u
+  // polskiego dostawcy internetu — obie rzeczy gorsze niż po prostu
+  // poczekać chwilę i spróbować ponownie tego samego, sprawdzonego serwera).
+  const RETRY_DELAYS_MS = [0, 3000, 8000];
   let data;
   let lastErr;
-  for (let i = 0; i < OVERPASS_MIRRORS.length; i++){
+  for (let i = 0; i < RETRY_DELAYS_MS.length; i++){
     try {
-      if (i > 0) await new Promise(r => setTimeout(r, 2000));
-      data = await fetchNearbyStoresFromOSMOnce(query, OVERPASS_MIRRORS[i]);
+      if (RETRY_DELAYS_MS[i] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i]));
+      data = await fetchNearbyStoresFromOSMOnce(query);
       lastErr = null;
       break;
     } catch (err){
       lastErr = err;
-      const more = i < OVERPASS_MIRRORS.length - 1;
-      console.warn('Zapytanie do ' + OVERPASS_MIRRORS[i] + ' nie powiodło się' + (more ? ', próbuję innego serwera:' : ' (ostatnia próba):'), err);
+      const more = i < RETRY_DELAYS_MS.length - 1;
+      console.warn('Próba ' + (i + 1) + '/' + RETRY_DELAYS_MS.length + ' zapytania do Overpass nie powiodła się' + (more ? ', próbuję ponownie:' : ' (ostatnia próba):'), err);
     }
   }
   if (lastErr) throw lastErr; // błąd z OSTATNIEJ próby trafia do wywołującego
