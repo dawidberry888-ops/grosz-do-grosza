@@ -1478,11 +1478,20 @@ async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
   // większy zbiór punktów i regularnie kończyła się przekroczeniem czasu
   // (sprawdzone bezpośrednio na overpass-api.de: bez tej zmiany zapytanie
   // nie kończyło się w ogóle, z nią — udana odpowiedź w ok. 20-30 sekund).
+  // Ciąg dalszy tej samej historii co node/way wyżej: budynek Lidla przy
+  // Żupnicznej (wciąż zgłoszony jako "nie znajduje" PO dodaniu "way") jest w
+  // OpenStreetMap zmapowany jako "relation" (multipolygon — budynek o bardziej
+  // złożonym kształcie, np. z wewnętrznym podwórkiem albo kilkoma częściami),
+  // nie jako pojedynczy "way". Bez tego appka pomijała każdy sklep zmapowany
+  // w ten sposób, mimo identycznych tagów shop/brand/name — "out center"
+  // dokłada wyliczony środek także dla relation, dokładnie jak dla way.
   const query = '[out:json][timeout:30];(' +
     'node["shop"="supermarket"]["name"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
     'node["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
     'way["shop"="supermarket"]["name"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
     'way["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
+    'relation["shop"="supermarket"]["name"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
+    'relation["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
     ');out center;';
 
   let data;
@@ -1497,12 +1506,12 @@ async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
   const seenIds = new Set();
   const results = [];
   for (const el of (data.elements || [])){
-    // node ma własne lat/lon; way (kontur budynku) ma tylko "center", które
-    // dokłada "out center" w zapytaniu powyżej.
+    // node ma własne lat/lon; way (kontur budynku) i relation (multipolygon)
+    // mają tylko "center", które dokłada "out center" w zapytaniu powyżej.
     let elLat, elLon;
     if (el.type === 'node' && typeof el.lat === 'number' && typeof el.lon === 'number'){
       elLat = el.lat; elLon = el.lon;
-    } else if (el.type === 'way' && el.center && typeof el.center.lat === 'number' && typeof el.center.lon === 'number'){
+    } else if ((el.type === 'way' || el.type === 'relation') && el.center && typeof el.center.lat === 'number' && typeof el.center.lon === 'number'){
       elLat = el.center.lat; elLon = el.center.lon;
     } else {
       continue;
@@ -3095,9 +3104,22 @@ function renderStoresPanel(){
 
   const withDist = storesWithDistance();
 
+  // "Najbliższe sklepy" pokazywało DOSŁOWNIE każdy sklep, jaki appka kiedykolwiek
+  // poznała (ręcznie dodany albo znaleziony przez OSM), posortowany wg odległości,
+  // ale bez żadnego górnego limitu — zgłoszone przez Dawida jako "sklepy powyżej
+  // 2 km wciąż są na liście". Limit wyszukiwania OSM (OSM_STORE_SEARCH_RADIUS_KM)
+  // dotyczył tylko tego, co NOWE wyszukiwanie sprowadza — nie filtrował w ogóle
+  // tego, co appka już wcześniej zapisała (np. z czasów, gdy promień wyszukiwania
+  // był jeszcze 10 km, albo sklep dodany ręcznie daleko od domu). "Zarządzaj
+  // sklepami" niżej (withDist, bez tego filtra) nadal celowo pokazuje WSZYSTKIE
+  // sklepy niezależnie od odległości — to tam się nimi zarządza.
+  const withinRadius = withDist.filter(s => s.dist != null && s.dist <= OSM_STORE_SEARCH_RADIUS_KM);
+
   // Filtr sieci nad "Najbliższe sklepy" — pozwala pokazać np. tylko Lidl i
   // Biedronkę, jeśli tylko te masz w pobliżu, albo tylko jedną konkretną sieć.
-  const allChainNames = [...new Set(state.stores.map(s => s.name))].sort();
+  // Budowany z sklepów W PROMIENIU (nie ze wszystkich kiedykolwiek dodanych) —
+  // inaczej appka pokazywałaby chip sieci, której i tak nie zobaczysz po kliknięciu.
+  const allChainNames = [...new Set(withinRadius.map(s => s.name))].sort();
   const chainFilterEl = document.getElementById('nearestStoreFilter');
   chainFilterEl.innerHTML = allChainNames.length > 1
     ? '<button type="button" class="chip' + (nearestStoreFilter.size === 0 ? ' active' : '') + '" data-nearest-chip="">Wszystkie</button>' +
@@ -3106,13 +3128,15 @@ function renderStoresPanel(){
       ).join('')
     : '';
 
-  const visibleNearest = nearestStoreFilter.size ? withDist.filter(s => nearestStoreFilter.has(s.name)) : withDist;
+  const visibleNearest = nearestStoreFilter.size ? withinRadius.filter(s => nearestStoreFilter.has(s.name)) : withinRadius;
 
   const nearest = document.getElementById('nearestStoresList');
   if (!state.home){
     nearest.innerHTML = '<div class="empty-state">Wpisz swój adres albo współrzędne powyżej, żeby zobaczyć najbliższe sklepy.</div>';
   } else if (!withDist.length){
     nearest.innerHTML = '<div class="empty-state">Brak dodanych sklepów. Dodaj je w sekcji „Zarządzaj sklepami” poniżej.</div>';
+  } else if (!withinRadius.length){
+    nearest.innerHTML = '<div class="empty-state">Brak sklepów w promieniu ' + OSM_STORE_SEARCH_RADIUS_KM + ' km od Twojej lokalizacji. Masz już dodane sklepy dalej — zobacz je w „Zarządzaj sklepami” poniżej, albo spróbuj „Znajdź pobliskie sklepy”.</div>';
   } else if (!visibleNearest.length){
     nearest.innerHTML = '<div class="empty-state">Brak sklepów pasujących do wybranego filtra.</div>';
   } else {
