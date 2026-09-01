@@ -1348,25 +1348,32 @@ const OSM_STORE_BRANDS = ['Biedronka', 'Lidl', 'Kaufland'];
    sklepu, więc użytkownik sam oceni, czy warto tam jechać, a w razie
    potrzeby może wyszukać ponownie po zmianie zapisanej lokalizacji. */
 const OSM_STORE_SEARCH_RADIUS_KM = 2;
-/* Darmowy, publiczny serwer Overpass (zapytania do danych OpenStreetMap) —
-   appka nie ma własnego backendu ani klucza API, tak samo jak przy
-   geokodowaniu adresu (patrz geocodeAddress, ten sam ekosystem OSM).
+/* HISTORIA (ważne, żeby nikt tego nie "naprawił" z powrotem na darmowy
+   Overpass): appka pierwotnie pytała wprost z przeglądarki darmowy, publiczny
+   serwer Overpass (overpass-api.de) o dane OpenStreetMap. Był on jednak
+   współdzielony z całym światem i regularnie albo bardzo wolny (20-30 s na
+   odpowiedź), albo wprost odrzucał zapytania (HTTP 429 "za dużo zapytań") w
+   zależności od tego, ile osób akurat go w danej chwili obciążało — coś, na
+   co appka nie miała żadnego wpływu, niezależnie od tego, ile razy próbowała
+   ponownie. Sprawdzone i odrzucone wcześniej "alternatywne" darmowe mirrory
+   (kumi.systems/private.coffee — udokumentowane problemy z CORS; maps.mail.ru
+   — rosyjski, ryzyko blokady przez polskiego dostawcę internetu) nie
+   rozwiązywały tego wcale, bo problemem było samo obciążenie darmowej
+   infrastruktury, nie konkretny adres serwera.
 
-   UWAGA: appka celowo NIE korzysta z żadnego "alternatywnego" darmowego
-   mirrora Overpass (np. kumi.systems/private.coffee, maps.mail.ru) jako
-   zapasowego serwera — sprawdziłem to i mirrory te albo mają udokumentowane
-   problemy z CORS (blokują wprost zapytania z przeglądarki, co u Dawida
-   objawiło się jako "Appka nie może połączyć się..." zaraz po tym, jak
-   spróbowałem to dodać — wycofane), albo (mail.ru) są rosyjskie, co niesie
-   realne ryzyko blokady przez polskiego dostawcę internetu/firewall. Jedyny
-   serwer z pewnym, sprawdzonym wsparciem CORS dla zapytań wprost z
-   przeglądarki to właśnie overpass-api.de — to na nim opiera się m.in.
-   oficjalne narzędzie overpass-turbo. Odporność na przeciążenia zapewnia
-   więc NIE inny serwer, a więcej prób z odczekaniem (patrz
-   fetchNearbyStoresFromOSM) — overpass-api.de to od środka kilka
-   fizycznych maszyn za wspólnym adresem, więc kolejna próba realnie może
-   trafić na mniej obciążoną. */
-const OVERPASS_API_URL = 'https://overpass-api.de/api/interpreter';
+   Rozwiązanie (za zgodą Dawida): appka woła teraz WŁASNĄ funkcję Supabase
+   Edge Function (patrz FIND_STORES_EDGE_FUNCTION i
+   fetchNearbyStoresFromOSM), która po stronie serwera odpytuje płatne API
+   Geoapify Places (te same dane OpenStreetMap, ale z gwarantowaną
+   przepustowością — koniec z 429/długim oczekiwaniem). Klucz API do
+   Geoapify jest sekretem po stronie tej funkcji (zmienna środowiskowa
+   GEOAPIFY_API_KEY) — appka nigdy go nie zna ani nie wysyła, dokładnie tak
+   samo jak klucz "anon" Supabase jest bezpieczny do trzymania wprost w
+   kodzie appki (RLS/SECURITY DEFINER po stronie bazy), ten sekret jest
+   bezpieczny dzięki temu, że mieszka wyłącznie po stronie serwera. Przy
+   niewielkiej skali tej appki (garstka użytkowników) mieści się to w
+   darmowym limicie Geoapify (3000 zapytań/dzień) — realny koszt: 0 zł. */
+const FIND_STORES_EDGE_FUNCTION = 'find-nearby-stores';
 
 let artifactAPI = null;
 let capabilityAttempted = false;
@@ -1511,18 +1518,19 @@ function geocodeErrorMessage(err){
 /* Czytelny komunikat błędu dla "Znajdź pobliskie sklepy" (patrz
    fetchNearbyStoresFromOSM) — ten sam wzorzec co geocodeErrorMessage. */
 function osmStoreErrorMessage(err){
-  console.error('Wyszukiwanie pobliskich sklepów (OSM) nie powiodło się:', err);
+  console.error('Wyszukiwanie pobliskich sklepów nie powiodło się:', err);
   if (err && err.name === 'AbortError') return 'Wyszukiwanie sklepów trwało zbyt długo. Spróbuj ponownie za chwilę.';
   if (err && err.httpStatus === 429){
-    // Darmowy serwer Overpass ogranicza liczbę zapytań na godzinę z jednego
-    // adresu IP — appka już sama odczekała i spróbowała ponownie (patrz
-    // fetchNearbyStoresFromOSM), więc skoro nadal 429, limit trzeba
-    // przeczekać dłużej niż appka może pozwolić sobie czekać w miejscu.
-    return 'Serwer OpenStreetMap chwilowo ogranicza liczbę zapytań z Twojej sieci (zbyt wiele w krótkim czasie) — odczekaj kilka minut i spróbuj ponownie. Jeśli nadal nie działa, użyj „Nie widzisz swojego sklepu? Napisz do nas” poniżej albo dodaj sklep ręcznie.';
+    // Odkąd appka woła własną funkcję Supabase Edge Function (płatne
+    // Geoapify za nią) zamiast bezpośrednio darmowego, przeciążonego
+    // Overpass, ten kod błędu jest już bardzo mało prawdopodobny — ale
+    // zostawiamy czytelny komunikat na wszelki wypadek (np. appka stanie
+    // się dużo popularniejsza niż darmowy limit Geoapify).
+    return 'Serwer appki chwilowo ogranicza liczbę zapytań (zbyt wiele w krótkim czasie) — odczekaj chwilę i spróbuj ponownie. Jeśli nadal nie działa, użyj „Nie widzisz swojego sklepu? Napisz do nas” poniżej albo dodaj sklep ręcznie.';
   }
   const msg = (err && err.message) ? String(err.message).toLowerCase() : '';
   if (err instanceof TypeError || msg.includes('fetch') || msg.includes('network')){
-    return 'Appka nie może połączyć się z usługą wyszukiwania sklepów (OpenStreetMap). Ta funkcja wymaga prawdziwego dostępu do internetu — nie zadziała w podglądzie ani w wersji hostowanej jako prywatna strona.';
+    return 'Appka nie może połączyć się z usługą wyszukiwania sklepów. Ta funkcja wymaga prawdziwego dostępu do internetu — nie zadziała w podglądzie ani w wersji hostowanej jako prywatna strona.';
   }
   return 'Nie udało się pobrać listy sklepów (' + (err && err.message ? err.message : 'nieznany błąd') + '). Spróbuj ponownie za chwilę.';
 }
@@ -1539,146 +1547,98 @@ function findNearbyStore(name, lat, lng, list){
   return null;
 }
 
-/* Pyta darmowy serwer Overpass (dane OpenStreetMap) o sklepy z listy
-   OSM_STORE_BRANDS w promieniu OSM_STORE_SEARCH_RADIUS_KM od podanych
-   współrzędnych. Zwraca gotowe obiekty sklepów (source:'osm') — appka sama
-   scala je potem z resztą listy (patrz przycisk "Znajdź pobliskie sklepy").
-   Rzuca wyjątek przy błędzie sieci/serwera/timeoutu (15 s, zapytania do
-   Overpass bywają wolniejsze niż samo geokodowanie) — appka pokazuje wtedy
-   czytelny komunikat, tak jak przy geocodeAddress. */
-/* Pojedyncza próba zapytania do Overpass — wydzielona osobno, bo
-   fetchNearbyStoresFromOSM próbuje kilkukrotnie z odczekaniem (patrz
-   niżej): darmowy, współdzielony serwer Overpass bywa niestabilny (raz
-   odpowiada w 8 s, raz w 30 s, raz w ogóle nie zdąży/zwróci 504) w sposób
-   niezwiązany z samym zapytaniem — kolejna próba chwilę później częściej
-   trafia na mniej obciążoną fizyczną maszynę (overpass-api.de to od środka
-   kilka serwerów za wspólnym adresem) i się udaje. */
-async function fetchNearbyStoresFromOSMOnce(query){
-  // Darmowy, współdzielony serwer Overpass bywa POWOLNY (sprawdzone
-  // bezpośrednio: nawet 20-30 sekund na odpowiedź to normalka, nie awaria)
-  // — limit czasu musi być wyraźnie dłuższy niż przy geokodowaniu adresu
-  // (10 s), inaczej appka przerywałaby połączenie, ZANIM serwer zdążyłby w
-  // ogóle odpowiedzieć.
+/* Pyta o sklepy z listy OSM_STORE_BRANDS w promieniu OSM_STORE_SEARCH_RADIUS_KM
+   od podanych współrzędnych — poprzez WŁASNĄ funkcję Supabase Edge Function
+   (patrz FIND_STORES_EDGE_FUNCTION i obszerny komentarz historyczny przy tej
+   stałej: appka już NIE woła Overpass wprost z przeglądarki). Zwraca gotowe
+   obiekty sklepów (source:'osm') — appka sama scala je potem z resztą listy
+   (patrz przycisk "Znajdź pobliskie sklepy"). Rzuca wyjątek przy błędzie
+   sieci/serwera/timeoutu — appka pokazuje wtedy czytelny komunikat, tak jak
+   przy geocodeAddress. */
+/* Pojedyncza próba wywołania funkcji Edge — wydzielona osobno, bo
+   fetchNearbyStoresFromOSM ponawia raz w razie zwykłego, przejściowego
+   zacięcia się sieci (patrz niżej). Limit czasu jest krótki (15 s): w
+   odróżnieniu od dawnego darmowego Overpass, płatny Geoapify za funkcją
+   Edge odpowiada zwykle w 1-3 sekundy, więc dłuższe oczekiwanie oznaczałoby
+   realny problem, a nie "normalne" obciążenie darmowego serwera. */
+async function fetchNearbyStoresFromOSMOnce(lat, lng, radiusKm){
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new DOMException('Przekroczono limit czasu', 'AbortError')), 40000);
+    timeoutId = setTimeout(() => reject(new DOMException('Przekroczono limit czasu', 'AbortError')), 15000);
   });
-  let data;
   try {
-    const res = await Promise.race([
-      fetch(OVERPASS_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: query
+    const { data, error } = await Promise.race([
+      supabaseClient.functions.invoke(FIND_STORES_EDGE_FUNCTION, {
+        body: { lat, lng, radiusKm: radiusKm || OSM_STORE_SEARCH_RADIUS_KM },
       }),
-      timeoutPromise
+      timeoutPromise,
     ]);
-    if (!res.ok){
-      // Uwaga: sprawdzone bezpośrednio (WebSearch, dokumentacja Overpass-API
-      // na GitHubie, zgłoszenie #351 proszące autora o dodanie tego nagłówka)
-      // — overpass-api.de NIE wysyła nagłówka Retry-After przy 429, więc appka
-      // nie może na nim polegać przy ustalaniu, ile czekać. Zapamiętujemy
-      // tylko kod HTTP (błąd 429 dostaje osobny, bardziej pomocny komunikat
-      // w osmStoreErrorMessage), a odstęp między próbami zawsze liczymy sami.
-      const err = new Error('HTTP ' + res.status);
-      err.httpStatus = res.status;
+    if (error){
+      // supabase-js przy odpowiedzi spoza 2xx nie wypełnia error.message
+      // treścią JSON, którą sama zwróciła nasza funkcja (patrz index.ts) —
+      // trzeba ją dociągnąć osobno z error.context (surowy obiekt Response).
+      let message = error.message || 'nieznany błąd';
+      let httpStatus;
+      try {
+        if (error.context && typeof error.context.json === 'function'){
+          const body = await error.context.json();
+          if (body && body.error) message = body.error;
+        }
+        if (error.context && error.context.status) httpStatus = error.context.status;
+      } catch(e){}
+      const err = new Error(message);
+      if (httpStatus) err.httpStatus = httpStatus;
       throw err;
     }
-    data = await res.json();
-    // Overpass czasem odpowiada HTTP 200 z pustym elements[] i komunikatem
-    // błędu w polu "remark" (np. własny timeout serwera) — bez tego
-    // sprawdzenia appka potraktowałaby to jako "0 sklepów w pobliżu"
-    // zamiast jako błąd, do tego cicho, bez żadnego komunikatu dla
-    // użytkownika (dokładnie objaw, który zgłosił Dawid).
-    if (data && data.remark) throw new Error(data.remark);
+    return (data && Array.isArray(data.places)) ? data.places : [];
   } finally {
     clearTimeout(timeoutId);
   }
-  return data;
 }
 
 async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
-  const radiusM = Math.round((radiusKm || OSM_STORE_SEARCH_RADIUS_KM) * 1000);
-  const brandPattern = OSM_STORE_BRANDS.join('|');
-  // node = pojedynczy punkt na mapie, way = zarys budynku (poligon) — WIELE
-  // sklepów (potwierdzone bezpośrednio na przykładzie Lidla przy ul.
-  // Żupnicznej w Warszawie, zgłoszonego jako "brakujący na mapie") jest w
-  // OpenStreetMap zmapowanych jako "way" (kontur budynku z tagami sklepu),
-  // a NIE jako "node" — wcześniejsza wersja zapytania pytała wyłącznie o
-  // node'y, więc każdy sklep zmapowany jako poligon budynku był całkowicie
-  // pomijany, mimo że miał identyczne tagi shop/brand/name. Dodajemy więc
-  // te same warunki także dla "way", a "out center" dokłada do każdego
-  // takiego wyniku wyliczony środek poligonu (bo way nie ma własnego
-  // pojedynczego lat/lon jak node). Filtr "shop"="supermarket" jest nadal
-  // celowo dokładnym dopasowaniem (bez regexu/"convenience") — serwer
-  // Overpass może wtedy od razu skorzystać z indeksu po wartości tagu i
-  // dopiero na tym dużo mniejszym zbiorze sprawdzać regexem name/brand.
-  // Wcześniejsza wersja (regex też na "shop", plus "convenience" — bardzo
-  // pospolity tag, np. każdy kiosk) kazała serwerowi przeglądać dużo
-  // większy zbiór punktów i regularnie kończyła się przekroczeniem czasu
-  // (sprawdzone bezpośrednio na overpass-api.de: bez tej zmiany zapytanie
-  // nie kończyło się w ogóle, z nią — udana odpowiedź w ok. 20-30 sekund).
-  // Ciąg dalszy tej samej historii co node/way wyżej: budynek Lidla przy
-  // Żupnicznej (wciąż zgłoszony jako "nie znajduje" PO dodaniu "way") jest w
-  // OpenStreetMap zmapowany jako "relation" (multipolygon — budynek o bardziej
-  // złożonym kształcie, np. z wewnętrznym podwórkiem albo kilkoma częściami),
-  // nie jako pojedynczy "way". Bez tego appka pomijała każdy sklep zmapowany
-  // w ten sposób, mimo identycznych tagów shop/brand/name — "out center"
-  // dokłada wyliczony środek także dla relation, dokładnie jak dla way.
-  const query = '[out:json][timeout:30];(' +
-    'node["shop"="supermarket"]["name"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
-    'node["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
-    'way["shop"="supermarket"]["name"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
-    'way["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
-    'relation["shop"="supermarket"]["name"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
-    'relation["shop"="supermarket"]["brand"~"' + brandPattern + '",i](around:' + radiusM + ',' + lat + ',' + lng + ');' +
-    ');out center;';
-
-  // Próbujemy do TRZECH razy z rosnącym odczekaniem (domyślnie 0 s / 3 s / 8 s)
-  // — celowo WCIĄŻ ten sam serwer (patrz obszerny komentarz przy
-  // OVERPASS_API_URL: sprawdzone "alternatywne" darmowe mirrory albo mają
-  // problemy z CORS w przeglądarce, albo są rosyjskie i ryzykują blokadę u
-  // polskiego dostawcy internetu — obie rzeczy gorsze niż po prostu
-  // poczekać chwilę i spróbować ponownie tego samego, sprawdzonego serwera).
-  const DEFAULT_RETRY_DELAYS_MS = [0, 3000, 8000];
-  const MAX_ATTEMPTS = DEFAULT_RETRY_DELAYS_MS.length;
-  let data;
+  if (!supabaseClient){
+    throw new Error('Wyszukiwanie sklepów wymaga appki z dostępem do sieci — otwórz zwykły plik appki albo wersję wystawioną na GitHub Pages (link w Artifact tego nie obsługuje).');
+  }
+  // Krótkie ponawianie (od razu / po 2 s) — już NIE na wypadek przeciążenia
+  // darmowego, współdzielonego serwera (Geoapify za naszą funkcją Edge to
+  // płatna usługa z gwarantowaną przepustowością), a wyłącznie na wypadek
+  // zwykłego, przejściowego zacięcia się sieci u użytkownika.
+  const RETRY_DELAYS_MS = [0, 2000];
+  let places;
   let lastErr;
-  for (let i = 0; i < MAX_ATTEMPTS; i++){
+  for (let i = 0; i < RETRY_DELAYS_MS.length; i++){
     try {
-      if (DEFAULT_RETRY_DELAYS_MS[i] > 0) await new Promise(r => setTimeout(r, DEFAULT_RETRY_DELAYS_MS[i]));
-      data = await fetchNearbyStoresFromOSMOnce(query);
+      if (RETRY_DELAYS_MS[i] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i]));
+      places = await fetchNearbyStoresFromOSMOnce(lat, lng, radiusKm);
       lastErr = null;
       break;
     } catch (err){
       lastErr = err;
-      const more = i < MAX_ATTEMPTS - 1;
-      console.warn('Próba ' + (i + 1) + '/' + MAX_ATTEMPTS + ' zapytania do Overpass nie powiodła się' + (more ? ', próbuję ponownie za ' + Math.round(DEFAULT_RETRY_DELAYS_MS[i + 1] / 1000) + ' s:' : ' (ostatnia próba):'), err);
+      const more = i < RETRY_DELAYS_MS.length - 1;
+      console.warn('Próba ' + (i + 1) + '/' + RETRY_DELAYS_MS.length + ' wyszukania sklepów nie powiodła się' + (more ? ', próbuję ponownie za chwilę:' : ' (ostatnia próba):'), err);
     }
   }
   if (lastErr) throw lastErr; // błąd z OSTATNIEJ próby trafia do wywołującego
 
+  // Dopasowanie do marki i odrzucenie duplikatów zostaje PO STRONIE APPKI
+  // (a nie w funkcji Edge) — to ten sam wzorzec co wcześniej z Overpass:
+  // OSM_STORE_BRANDS to jedno, znane miejsce definicji sieci do szukania,
+  // funkcja Edge celowo zwraca surowe trafienia z Geoapify bez własnej
+  // logiki biznesowej appki.
   const seenIds = new Set();
   const results = [];
-  for (const el of (data.elements || [])){
-    // node ma własne lat/lon; way (kontur budynku) i relation (multipolygon)
-    // mają tylko "center", które dokłada "out center" w zapytaniu powyżej.
-    let elLat, elLon;
-    if (el.type === 'node' && typeof el.lat === 'number' && typeof el.lon === 'number'){
-      elLat = el.lat; elLon = el.lon;
-    } else if ((el.type === 'way' || el.type === 'relation') && el.center && typeof el.center.lat === 'number' && typeof el.center.lon === 'number'){
-      elLat = el.center.lat; elLon = el.center.lon;
-    } else {
-      continue;
-    }
-    const dedupKey = el.type + '/' + el.id;
-    if (seenIds.has(dedupKey)) continue;
-    seenIds.add(dedupKey);
-    const tags = el.tags || {};
-    const label = tags.name || tags.brand || '';
+  for (const p of (places || [])){
+    if (!p || !isFinite(p.lat) || !isFinite(p.lng)) continue;
+    const label = p.name || p.brand || '';
     const chain = OSM_STORE_BRANDS.find(b => label.toLowerCase().includes(b.toLowerCase()));
     if (!chain) continue;
-    results.push({ id: uid(), name: chain, lat: elLat, lng: elLon, source: 'osm' });
+    // Geoapify daje stabilne place_id — gdy go brak, dedupujemy po marce +
+    // zaokrąglonych współrzędnych (tak jak poprzednio po type+id z Overpass).
+    const dedupKey = p.id || (chain + '|' + p.lat.toFixed(5) + '|' + p.lng.toFixed(5));
+    if (seenIds.has(dedupKey)) continue;
+    seenIds.add(dedupKey);
+    results.push({ id: uid(), name: chain, lat: p.lat, lng: p.lng, source: 'osm' });
   }
   return results;
 }
@@ -4096,9 +4056,7 @@ function bindEvents(){
     const originalLabel = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Szukam sklepów…';
-    // Darmowy serwer Overpass bywa wolny — appka uprzedza od razu, żeby
-    // 20-30 sekund oczekiwania nie wyglądało na zawieszenie się appki.
-    statusEl.textContent = 'Szukam Biedronki, Lidla i Kauflandu w pobliżu… może to potrwać nawet pół minuty (darmowy serwer OpenStreetMap bywa wolny).';
+    statusEl.textContent = 'Szukam Biedronki, Lidla i Kauflandu w pobliżu…';
     try {
       const found = await fetchNearbyStoresFromOSM(state.home.lat, state.home.lng);
       // Zastępujemy tylko poprzednią partię source==='osm' — ręcznie dodane
@@ -4108,8 +4066,8 @@ function bindEvents(){
       for (const f of found){
         // Pomijamy, jeśli sklep tej samej sieci jest już bardzo blisko — czy
         // to ręcznie dodany, czy już zaakceptowany w tym samym wyszukiwaniu
-        // (Overpass czasem zwraca dwa węzły dla jednego sklepu, np. wejście
-        // i budynek osobno).
+        // (Geoapify/OSM czasem zwraca dwa punkty dla jednego sklepu, np.
+        // wejście i budynek osobno).
         if (findNearbyStore(f.name, f.lat, f.lng, keepStores.concat(accepted))) continue;
         accepted.push(f);
       }
