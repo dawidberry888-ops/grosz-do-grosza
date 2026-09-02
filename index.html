@@ -471,6 +471,11 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .product-row .pmeta .expiring-soon{color:var(--warn); font-weight:700;}
 .product-row .pmeta .upcoming{color:var(--accent); font-weight:700;}
 .product-row .promo-qty-line{flex-basis:100%; font-size:0.75rem; font-weight:600; color:var(--warn); margin-top:1px;}
+/* Wybór konkretnego produktu, gdy do składnika przepisu pasuje ich kilka
+   naraz (patrz ingredientChoiceKey/renderRecipesPanel) — osobna linia nad
+   resztą wiersza produktu, jak inne linie .product-row (flex-basis:100%). */
+.product-row .ingredient-pick{flex-basis:100%; margin:2px 0;}
+.product-row .ingredient-pick select{width:100%; font-family:'JetBrains Mono', monospace; font-size:0.75rem; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink);}
 
 /* karty przepisów (zakładka Przepisy) — patrz renderRecipesPanel */
 .recipe-card{border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;}
@@ -524,18 +529,32 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .chip.active{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
 
 /* Filtr kategorii w "Co dziś kupisz" — rozwijany panel z checkboxami zamiast
-   rzędu kafelków (zgłoszone przez Dawida: przy 14 kategoriach kafelki się
+   rzędu kafelków (zgłoszone przez Dawida: przy 17 kategoriach kafelki się
    "rozłażą" na kilka linii). Wielokrotny wybór zostaje (patrz
    basketCategoryFilter — Set), tylko forma inna niż w "Wszystkie promocje",
-   gdzie jedna rozwijana lista wystarcza, bo tam wybór jest pojedynczy. */
-.category-dropdown{margin:2px 0 12px;}
+   gdzie jedna rozwijana lista wystarcza, bo tam wybór jest pojedynczy.
+   Panel UNOSI SIĘ nad resztą karty (position:absolute), zamiast rozpychać
+   układ strony w miejscu — druga wersja tego filtra, po tym jak Dawid uznał
+   pierwszą (panel wpychany na stałe w layout pod przyciskiem) za wyglądającą
+   na zbędną/nieklikalną: "Button Kategorie jest tutaj bezużyteczny". Zamyka
+   się przyciskiem "Zastosuj" ORAZ kliknięciem gdziekolwiek poza nim (patrz
+   bindEvents), tak jak menu "Więcej" w pasku zakładek. */
+.category-dropdown{position:relative; margin:2px 0 12px;}
 .category-dropdown-panel{
-  display:flex; flex-direction:column; gap:2px; margin-top:6px; padding:8px 10px;
-  border:1px solid var(--line); border-radius:10px; background:var(--paper);
-  max-height:240px; overflow-y:auto;
+  position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:5;
+  display:flex; flex-direction:column; gap:2px; padding:8px 10px;
+  border:1px solid var(--line); border-radius:10px; background:var(--paper-raised);
+  box-shadow:var(--shadow); max-height:280px; overflow-y:auto;
 }
-.category-check-row{display:flex; align-items:center; gap:8px; font-size:0.8125rem; color:var(--ink); padding:3px 0; cursor:pointer;}
+/* Ta sama pułapka co #contactBubblePanel/#moreTabMenu: reguła autora
+   ".category-dropdown-panel{display:flex}" ma pierwszeństwo nad domyślną
+   regułą przeglądarki "[hidden]{display:none}", więc bez tego jawnego
+   nadpisania samo ustawienie atrybutu hidden (albo wyczyszczenie inline
+   style.display) NIE chowałoby panelu. */
+.category-dropdown-panel[hidden]{display:none;}
+.category-check-row{display:flex; align-items:center; gap:8px; font-size:0.8125rem; color:var(--ink); padding:5px 2px; cursor:pointer;}
 .category-check-row input{width:auto; margin:0;}
+.category-dropdown-apply{margin-top:4px;}
 
 /* wybór kolorystyki appki (patrz #paletteChooser/renderPaletteChooser) */
 .palette-row{display:flex; gap:10px; flex-wrap:wrap;}
@@ -1554,6 +1573,17 @@ let nearestStoresVisibleCount = LIST_PAGE_SIZE; // reset tylko przy zmianie filt
 let manageStoresVisibleCount = LIST_PAGE_SIZE; // "Zarządzaj sklepami" nie ma filtra, więc rośnie tylko przy "Wczytaj więcej"
 let todayPicksVisibleCount = LIST_PAGE_SIZE; // "Za tyle dziś kupisz" (Dziś) — bez filtra, więc też rośnie tylko przy "Wczytaj więcej"
 let expandedRecipeIds = new Set(); // które karty przepisów są rozwinięte — czysto lokalne, nieprzetrwałe (patrz renderRecipesPanel)
+// Zgłoszenie Dawida: gdy do składnika (np. "szynka") pasuje kilka różnych
+// promocyjnych produktów naraz, appka pozwala wybrać, o który konkretnie
+// chodzi (patrz <select> w renderRecipesPanel). Wybór jest CELOWO równie
+// tymczasowy jak expandedRecipeIds powyżej — nic nie zapisujemy do state
+// ani localStorage — bo promocje zmieniają się co tydzień, więc zapamiętany
+// na stałe wybór szybko przestałby pasować do aktualnej listy. Żeby był
+// naprawdę "świeży" przy każdym ponownym otwarciu karty (nie tylko po
+// odświeżeniu strony), czyścimy wpis dla danego przepisu przy każdym
+// rozwinięciu jego karty (patrz listener [data-recipe-toggle]).
+// Kształt: { [przepisId]: { [indeksSkładnika]: 'sklep||nazwa produktu' } }
+let recipeIngredientChoice = {};
 let recipeCategoryFilter = ''; // '' = wszystkie kategorie, albo jedna z RECIPE_CATEGORIES
 // Wielokrotny wybór (Set), NIE pojedynczy sklep — zgłoszone przez Dawida:
 // "jeśli ktoś ma obok siebie Lidla i Biedronkę, to może chciałby skorzystać
@@ -2574,18 +2604,40 @@ function ingredientMatchesProduct(ingredientName, productName){
   return ingredientWords.every(stem => productWords.some(w => wordStemsMatch(stem, w)));
 }
 
-/* Znajduje najtańszy aktualnie aktywny produkt promocyjny pasujący do
-   danego składnika (spośród WSZYSTKICH sklepów — appka i tak pokazuje
-   nazwę sklepu przy dopasowaniu, więc użytkownik sam widzi, gdzie po niego
-   iść), albo null, jeśli żaden aktywny produkt nie pasuje — wtedy składnik
-   trafia na listę "do dokupienia" (patrz renderRecipesPanel). */
-function matchIngredientToActiveProduct(ingredientName, activeProducts){
-  let best = null;
-  for (const p of activeProducts){
-    if (!ingredientMatchesProduct(ingredientName, p.name)) continue;
-    if (!best || p.price < best.price) best = p;
-  }
-  return best;
+/* Znajduje WSZYSTKIE aktualnie aktywne produkty promocyjne pasujące do
+   danego składnika (spośród wszystkich sklepów — appka i tak pokazuje nazwę
+   sklepu przy dopasowaniu, więc użytkownik sam widzi, gdzie po niego iść).
+   Zgłoszenie Dawida: przy składniku typu "szynka" w promocji może akurat
+   być kilka różnych szynek naraz — appka kiedyś po cichu wybierała samą
+   najtańszą i chowała resztę, a użytkownik nie miał jak wybrać innej.
+   Zwracamy więc CAŁĄ listę pasujących produktów (posortowaną — patrz niżej),
+   a renderRecipesPanel() pokazuje resztę jako rozwijaną listę wyboru, gdy
+   jest więcej niż jedno dopasowanie; pusta lista = składnik trafia na
+   "do dokupienia".
+
+   Sortowanie decyduje, który produkt jest zaznaczony DOMYŚLNIE (pierwszy w
+   liście), zanim Dawid sam czegoś wybierze: najpierw najbliższy sklep (gdy
+   appka zna lokalizację — patrz storeDistanceKm), potem najtańszy jako
+   naturalny tiebreak (i jedyne kryterium, gdy lokalizacja nie jest ustawiona
+   — wtedy storeDistanceKm zwraca null dla każdego sklepu). */
+function matchIngredientToActiveProducts(ingredientName, activeProducts){
+  const matches = activeProducts.filter(p => ingredientMatchesProduct(ingredientName, p.name));
+  matches.sort((a, b) => {
+    const da = storeDistanceKm(a.store), db = storeDistanceKm(b.store);
+    if (da !== null && db !== null && da !== db) return da - db;
+    if (da !== null && db === null) return -1;
+    if (da === null && db !== null) return 1;
+    return a.price - b.price;
+  });
+  return matches;
+}
+/* Klucz identyfikujący konkretny produkt w obrębie dopasowań jednego
+   składnika (nie samo p.id — id bywa nieustalone/tymczasowe dla lokalnie
+   wklejonych produktów, a nazwa+sklep wystarczą, żeby odróżnić od siebie
+   kilka pasujących produktów tego samego składnika). Używane przez
+   <select> wyboru w kartach przepisów (patrz renderRecipesPanel). */
+function ingredientChoiceKey(p){
+  return p.store + '||' + p.name;
 }
 
 /* Niektóre promocje mają warunek "cena X zł, ale przy zakupie N sztuk"
@@ -3366,9 +3418,12 @@ function renderRecipesPanel(){
     : '';
 
   el.innerHTML = shown.map(r => {
-    const matches = r.ingredients.map(ing => {
-      const product = matchIngredientToActiveProduct(ing.name, activeProducts);
-      return { ing, product };
+    const choices = recipeIngredientChoice[r.id] || {};
+    const matches = r.ingredients.map((ing, idx) => {
+      const candidates = matchIngredientToActiveProducts(ing.name, activeProducts);
+      const chosenKey = choices[idx];
+      const chosen = chosenKey ? candidates.find(p => ingredientChoiceKey(p) === chosenKey) : null;
+      return { ing, idx, product: chosen || candidates[0] || null, candidates };
     });
     const matchedCount = matches.filter(m => m.product).length;
     const total = matches.length;
@@ -3376,10 +3431,22 @@ function renderRecipesPanel(){
     const badgeCls = matchedCount === total ? ' full' : '';
     let body = '';
     if (expanded){
-      const rows = matches.map(({ ing, product: p }) => {
+      const rows = matches.map(({ ing, idx, product: p, candidates }) => {
         if (p){
+          // Kilka pasujących produktów naraz (np. kilka różnych szynek w
+          // promocji) — zgłoszenie Dawida: zamiast po cichu chować resztę,
+          // appka pokazuje rozwijaną listę wyboru (domyślnie: najbliższy
+          // sklep, patrz matchIngredientToActiveProducts), a reszta wiersza
+          // (cena, ilość w promocji, "+ Dodaj do listy") dotyczy aktualnie
+          // wybranego produktu.
+          const pickerHtml = candidates.length > 1
+            ? '<div class="ingredient-pick"><select data-ing-pick-recipe="' + escapeHtml(r.id) + '" data-ing-pick-idx="' + idx + '">' +
+              candidates.map(c => '<option value="' + escapeHtml(ingredientChoiceKey(c)) + '"' + (ingredientChoiceKey(c) === ingredientChoiceKey(p) ? ' selected' : '') + '>' +
+                escapeHtml(c.name) + ' (' + escapeHtml(c.store) + ') · ' + formatPLN(c.price) + '</option>').join('') +
+              '</select></div>'
+            : '';
           return '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span> · ' + escapeHtml(ing.amount) + '</span><span class="pprice">' + formatPLN(p.price) + '</span>' +
-            promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + '</div>';
+            pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + '</div>';
         }
         return '<div class="missing-ingredient"><span>' + escapeHtml(ing.name) + (ing.amount ? ' <span class="hint">(' + escapeHtml(ing.amount) + ')</span>' : '') + '</span><span class="buy-tag">do dokupienia</span></div>';
       }).join('');
@@ -4308,7 +4375,8 @@ function renderBudgetBasketByStore(){
   catPanelEl.innerHTML = '<label class="category-check-row"><input type="checkbox" data-category-check="" ' + (basketCategoryFilter.size === 0 ? 'checked' : '') + '> <span>Wszystkie kategorie</span></label>' +
     PRODUCT_CATEGORIES.map(cat =>
       '<label class="category-check-row"><input type="checkbox" data-category-check="' + escapeHtml(cat) + '" ' + (basketCategoryFilter.has(cat) ? 'checked' : '') + '> <span>' + escapeHtml(cat) + '</span></label>'
-    ).join('');
+    ).join('') +
+    '<button type="button" class="btn btn-primary btn-sm category-dropdown-apply" data-category-apply="1">Zastosuj</button>';
   updateBasketCategoryDropdownLabel();
 
   const active = basketCategoryFilter.size
@@ -5257,7 +5325,15 @@ function bindEvents(){
     renderBudgetBasketByStore();
   });
 
-  document.getElementById('basketCategoryFilterToggle').addEventListener('click', function(){
+  function closeBasketCategoryPanel(){
+    const panel = document.getElementById('basketCategoryFilterPanel');
+    if (panel.hidden) return;
+    panel.hidden = true;
+    panel.style.display = '';
+    updateBasketCategoryDropdownLabel();
+  }
+  document.getElementById('basketCategoryFilterToggle').addEventListener('click', function(e){
+    e.stopPropagation();
     const panel = document.getElementById('basketCategoryFilterPanel');
     panel.hidden = !panel.hidden;
     panel.style.display = panel.hidden ? '' : 'flex';
@@ -5270,7 +5346,16 @@ function bindEvents(){
     else if (e.target.checked) basketCategoryFilter.add(cat);
     else basketCategoryFilter.delete(cat);
     basketVisibleCounts = {};
-    renderBudgetBasketByStore();
+    renderBudgetBasketByStore(); // podmienia tylko innerHTML panelu, więc panel zostaje otwarty (patrz komentarz przy .category-dropdown-panel)
+  });
+  document.getElementById('basketCategoryFilterPanel').addEventListener('click', (e) => {
+    if (e.target.closest('[data-category-apply]')) closeBasketCategoryPanel();
+  });
+  // Klik gdziekolwiek indziej zamyka pływający panel — ten sam wzorzec co
+  // menu "Więcej" w pasku zakładek.
+  document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('basketCategoryFilterWrap');
+    if (wrap && !wrap.hidden && !wrap.contains(e.target)) closeBasketCategoryPanel();
   });
 
   document.getElementById('budgetBasketByStore').addEventListener('click', (e) => {
@@ -5408,8 +5493,26 @@ function bindEvents(){
     const head = e.target.closest('[data-recipe-toggle]');
     if (!head) return;
     const id = head.getAttribute('data-recipe-toggle');
-    if (expandedRecipeIds.has(id)) expandedRecipeIds.delete(id);
-    else expandedRecipeIds.add(id);
+    if (expandedRecipeIds.has(id)){
+      expandedRecipeIds.delete(id);
+    } else {
+      expandedRecipeIds.add(id);
+      // Świeży wybór "która szynka" przy każdym ponownym otwarciu karty —
+      // patrz komentarz przy deklaracji recipeIngredientChoice.
+      delete recipeIngredientChoice[id];
+    }
+    renderRecipesPanel();
+  });
+
+  // Wybór konkretnego produktu, gdy do składnika pasuje kilka naraz
+  // (zgłoszenie Dawida, np. kilka różnych szynek w promocji) — patrz
+  // pickerHtml w renderRecipesPanel().
+  document.getElementById('recipesList').addEventListener('change', (e) => {
+    const recipeId = e.target.getAttribute('data-ing-pick-recipe');
+    if (recipeId === null) return;
+    const idx = e.target.getAttribute('data-ing-pick-idx');
+    recipeIngredientChoice[recipeId] = recipeIngredientChoice[recipeId] || {};
+    recipeIngredientChoice[recipeId][idx] = e.target.value;
     renderRecipesPanel();
   });
 
