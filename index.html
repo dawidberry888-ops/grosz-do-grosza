@@ -484,7 +484,14 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .recipe-card .match-badge{font-size:0.71875rem; color:var(--ink-soft); white-space:nowrap; font-family:'JetBrains Mono',monospace;}
 .recipe-card .match-badge.full{color:var(--growth); font-weight:700;}
 .recipe-card .body{display:flex; flex-direction:column; gap:10px;}
-.recipe-card .servings{font-size:0.75rem; color:var(--ink-faint);}
+.recipe-card .servings{font-size:0.75rem; color:var(--ink-faint); display:flex; align-items:center; flex-wrap:wrap; gap:6px;}
+.recipe-card .servings strong{color:var(--ink);}
+.recipe-card .servings-picker{display:inline-flex; gap:4px;}
+.recipe-card .servings-picker button{
+  font-family:'JetBrains Mono', monospace; font-size:0.6875rem; padding:2px 9px;
+  border-radius:999px; border:1px solid var(--line); background:var(--paper); color:var(--ink-soft); cursor:pointer;
+}
+.recipe-card .servings-picker button.active{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
 .recipe-card .instructions{font-size:0.8125rem; line-height:1.6; white-space:pre-wrap;}
 .recipe-card .ingredients-title{font-size:0.78125rem; font-weight:600; color:var(--ink-soft); margin-top:2px;}
 .missing-ingredient{
@@ -1186,6 +1193,9 @@ nav.tabbar{
       <h2>Przepisy<span class="sub">Dopasowane do Twoich aktualnych promocji — czego brakuje, dokupisz przy okazji zakupów</span></h2>
       <div id="recipeCategoryFilter" class="chip-row"></div>
       <div id="recipeStoreFilter" class="chip-row"></div>
+      <label class="hint" id="recipeMatchFilterRow" style="display:flex; align-items:center; gap:6px; margin:2px 0 12px;" hidden>
+        <input type="checkbox" id="recipeMatchFilterToggle" style="width:auto;"> Pokaż tylko przepisy, w których ponad połowa składników jest w promocji
+      </label>
       <div id="recipesList"></div>
     </div>
   </section>
@@ -1590,6 +1600,21 @@ let recipeCategoryFilter = ''; // '' = wszystkie kategorie, albo jedna z RECIPE_
 // z obu miejsc na zakupy". Puste = wszystkie sklepy. Ogranicza dopasowanie
 // składników TYLKO do zaznaczonych sklepów (patrz renderRecipesPanel).
 let recipeStoreFilter = new Set();
+// Zgłoszenie Dawida: lista przepisów będzie z czasem rosnąć (kolejne tury
+// dopisywania nowych dań pod kolejne listy promocji), więc appka sama ma
+// dbać, żeby się to nie rozłaziło w nieprzeglądalny bałagan — BEZ kasowania
+// czegokolwiek. Domyślnie (checkbox odznaczony) appka i tak zawsze sortuje
+// przepisy wg tego, ile składników akurat jest w promocji (patrz
+// renderRecipesPanel) — ten checkbox dodatkowo CHOWA te poniżej połowy
+// dopasowania. Żaden przepis nigdy nie znika na stałe z gista — tylko z
+// bieżącego widoku; za tydzień, przy innej promocji, może wrócić.
+let recipeMinMatchFilter = false;
+// Wybrana liczba porcji per przepis (2/4/6, zgłoszenie Dawida) — do
+// przeliczania ilości składników. Tak samo tymczasowe/nieprzetrwałe jak
+// recipeIngredientChoice: resetuje się do bazowej liczby porcji przy każdym
+// (ponownym) rozwinięciu karty (patrz listener [data-recipe-toggle]).
+// Kształt: { [przepisId]: 2|4|6 }
+let recipeServingsChoice = {};
 let recipesVisibleCount = LIST_PAGE_SIZE; // reset przy zmianie filtra kategorii/sklepu, patrz handlery #recipeCategoryFilter/#recipeStoreFilter
 let reportingProductId = null; // id produktu, dla którego aktualnie otwarty jest formularz "Zgłoś inną cenę"
 let editingProductId = null; // id produktu aktualnie edytowanego w sekcji "Zarządzaj listą" → "Twoje produkty"
@@ -2640,6 +2665,60 @@ function ingredientChoiceKey(p){
   return p.store + '||' + p.name;
 }
 
+/* Liczbę "matchedCount/total" dla przepisu (ile SKŁADNIKÓW ma choć jedno
+   dopasowanie w aktualnych promocjach) liczymy jako osobną, lekką funkcję —
+   niezależną od tego, KTÓRY konkretnie produkt jest aktualnie wybrany w
+   rozwiniętej karcie (recipeIngredientChoice) — dzięki temu sortowanie i
+   filtr ">50%" (patrz recipeMinMatchFilter) działają tak samo dla
+   ZWINIĘTYCH kart, których nikt jeszcze nie otworzył. */
+function recipeMatchStats(recipe, activeProducts){
+  const total = recipe.ingredients.length;
+  const matchedCount = recipe.ingredients.filter(ing => matchIngredientToActiveProducts(ing.name, activeProducts).length > 0).length;
+  return { matchedCount, total, ratio: total ? matchedCount / total : 0 };
+}
+
+/* Bazowa liczba porcji przepisu — wyciągnięta z wolnotekstowego pola
+   "servings" (np. "2 porcje" -> 2). Cała biblioteka przepisów jest pisana
+   pod 2 porcje (ustalone z Dawidem), ale gdyby kiedyś trafił się przepis z
+   inną wartością albo pustym/nietypowym tekstem, bezpiecznie spadamy do 2,
+   żeby przelicznik porcji (patrz scaleAmountText) zawsze miał punkt
+   odniesienia. */
+function baseServingsCount(recipe){
+  const m = String((recipe && recipe.servings) || '').match(/\d+/);
+  const n = m ? parseInt(m[0], 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 2;
+}
+
+/* Przelicznik porcji (zgłoszenie Dawida: wybór 2/4/6 porcji, appka sama
+   przelicza ilości). "amount" to wolny tekst (np. "400 g", "2 szt.",
+   "0,5 szt.", ale też "garść", "do smaku", "kilka listków (opcjonalnie)") —
+   skalujemy TYLKO wtedy, gdy tekst zaczyna się od liczby (ewentualnie
+   zakresu typu "3-4"); resztę (jednostkę, dopiski) zostawiamy bez zmian za
+   liczbą. Teksty bez liczby na początku (np. "garść") zostają nietknięte —
+   nie da się ich sensownie przeskalować. UWAGA: to celowo uproszczone —
+   appka nie odmienia polskich jednostek przez liczby (np. "2 łyżka"
+   zamiast poprawnego "2 łyżki"), tylko mnoży samą liczbę; ceną za prostotę
+   jest czasem niegramatyczny, ale zawsze czytelny wynik. */
+const AMOUNT_LEADING_NUMBER_RE = /^(\d+(?:[.,]\d+)?)(\s*-\s*(\d+(?:[.,]\d+)?))?(.*)$/;
+function formatScaledNumber(n){
+  let s = (Math.round(n * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  if (s === '' || s === '-0') s = '0';
+  return s.replace('.', ',');
+}
+function scaleAmountText(amount, factor){
+  if (!amount || !factor || factor === 1) return amount;
+  const m = String(amount).match(AMOUNT_LEADING_NUMBER_RE);
+  if (!m) return amount; // brak liczby na początku (np. "garść", "do smaku") — bez zmian
+  const first = parseFloat(m[1].replace(',', '.'));
+  if (!Number.isFinite(first)) return amount;
+  let out = formatScaledNumber(first * factor);
+  if (m[3]){
+    const second = parseFloat(m[3].replace(',', '.'));
+    if (Number.isFinite(second)) out += '-' + formatScaledNumber(second * factor);
+  }
+  return out + m[4];
+}
+
 /* Niektóre promocje mają warunek "cena X zł, ale przy zakupie N sztuk"
    (np. serek wiejski 1,99 zł przy zakupie dwóch) — sama cena jednostkowa
    bez tej informacji byłaby myląca. p.promoQty to wymagana liczba sztuk
@@ -3392,6 +3471,9 @@ function renderRecipesPanel(){
       ).join('')
     : '';
 
+  const matchFilterRow = document.getElementById('recipeMatchFilterRow');
+  if (matchFilterRow) matchFilterRow.hidden = !state.recipes.length;
+
   if (!state.recipes.length){
     el.innerHTML = '<div class="empty-state"><span class="big">🍳</span>Przepisów jeszcze nie ma — Dawid dopiero je dodaje. Zajrzyj tu ponownie za jakiś czas.</div>';
     return;
@@ -3412,12 +3494,27 @@ function renderRecipesPanel(){
   // coś na niego się pojawi.
   const activeProducts = state.products.filter(p => isPromoActive(p, todayKey) && (recipeStoreFilter.size === 0 || recipeStoreFilter.has(p.store)));
 
-  const shown = filteredRecipes.slice(0, recipesVisibleCount);
-  const loadMoreBtn = filteredRecipes.length > shown.length
-    ? '<button type="button" class="btn btn-ghost btn-sm btn-block" data-loadmore-recipes="1">Wczytaj więcej (' + (filteredRecipes.length - shown.length) + ')</button>'
+  // Zgłoszenie Dawida: lista przepisów będzie z czasem rosnąć, więc appka
+  // sama porządkuje widok — BEZ kasowania czegokolwiek z gista. Zawsze
+  // sortujemy wg tego, ile składników akurat jest w promocji (najlepiej
+  // dopasowane na górze; "Wczytaj więcej" pokazuje resztę), a opcjonalny
+  // checkbox (recipeMinMatchFilter) dodatkowo chowa te poniżej połowy
+  // dopasowania z widoku (nie z gista — za tydzień mogą wrócić).
+  let withStats = filteredRecipes.map(r => ({ r, stats: recipeMatchStats(r, activeProducts) }));
+  if (recipeMinMatchFilter) withStats = withStats.filter(x => x.stats.total > 0 && x.stats.ratio > 0.5);
+  withStats.sort((a, b) => b.stats.ratio - a.stats.ratio);
+
+  if (!withStats.length){
+    el.innerHTML = '<div class="empty-state">Brak przepisów, w których ponad połowa składników jest akurat w promocji. Odznacz filtr powyżej, żeby zobaczyć więcej.</div>';
+    return;
+  }
+
+  const shown = withStats.slice(0, recipesVisibleCount);
+  const loadMoreBtn = withStats.length > shown.length
+    ? '<button type="button" class="btn btn-ghost btn-sm btn-block" data-loadmore-recipes="1">Wczytaj więcej (' + (withStats.length - shown.length) + ')</button>'
     : '';
 
-  el.innerHTML = shown.map(r => {
+  el.innerHTML = shown.map(({ r, stats }) => {
     const choices = recipeIngredientChoice[r.id] || {};
     const matches = r.ingredients.map((ing, idx) => {
       const candidates = matchIngredientToActiveProducts(ing.name, activeProducts);
@@ -3425,13 +3522,22 @@ function renderRecipesPanel(){
       const chosen = chosenKey ? candidates.find(p => ingredientChoiceKey(p) === chosenKey) : null;
       return { ing, idx, product: chosen || candidates[0] || null, candidates };
     });
-    const matchedCount = matches.filter(m => m.product).length;
-    const total = matches.length;
+    const matchedCount = stats.matchedCount;
+    const total = stats.total;
     const expanded = expandedRecipeIds.has(r.id);
     const badgeCls = matchedCount === total ? ' full' : '';
+    // Liczba porcji (zgłoszenie Dawida): 🍽️ etykieta zamiast samego tekstu z
+    // gista + przełącznik 2/4/6, który przelicza ilości składników poniżej
+    // (patrz scaleAmountText). Wybór jest tymczasowy — resetuje się do
+    // bazowej liczby porcji przy każdym ponownym rozwinięciu karty, tak samo
+    // jak recipeIngredientChoice (patrz listener [data-recipe-toggle]).
+    const baseServings = baseServingsCount(r);
+    const selectedServings = recipeServingsChoice[r.id] || baseServings;
+    const servingsFactor = selectedServings / baseServings;
     let body = '';
     if (expanded){
       const rows = matches.map(({ ing, idx, product: p, candidates }) => {
+        const scaledAmount = scaleAmountText(ing.amount, servingsFactor);
         if (p){
           // Kilka pasujących produktów naraz (np. kilka różnych szynek w
           // promocji) — zgłoszenie Dawida: zamiast po cichu chować resztę,
@@ -3445,13 +3551,16 @@ function renderRecipesPanel(){
                 escapeHtml(c.name) + ' (' + escapeHtml(c.store) + ') · ' + formatPLN(c.price) + '</option>').join('') +
               '</select></div>'
             : '';
-          return '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span> · ' + escapeHtml(ing.amount) + '</span><span class="pprice">' + formatPLN(p.price) + '</span>' +
+          return '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span> · ' + escapeHtml(scaledAmount) + '</span><span class="pprice">' + formatPLN(p.price) + '</span>' +
             pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + '</div>';
         }
-        return '<div class="missing-ingredient"><span>' + escapeHtml(ing.name) + (ing.amount ? ' <span class="hint">(' + escapeHtml(ing.amount) + ')</span>' : '') + '</span><span class="buy-tag">do dokupienia</span></div>';
+        return '<div class="missing-ingredient"><span>' + escapeHtml(ing.name) + (scaledAmount ? ' <span class="hint">(' + escapeHtml(scaledAmount) + ')</span>' : '') + '</span><span class="buy-tag">do dokupienia</span></div>';
       }).join('');
+      const servingsPickerHtml = '<span class="servings-picker">' + [2, 4, 6].map(n =>
+        '<button type="button" class="' + (n === selectedServings ? 'active' : '') + '" data-servings-pick="' + escapeHtml(r.id) + '" data-servings-value="' + n + '">' + n + '</button>'
+      ).join('') + '</span>';
       body = '<div class="body">' +
-        (r.servings ? '<div class="servings">🍽️ ' + escapeHtml(r.servings) + '</div>' : '') +
+        '<div class="servings">🍽️ Liczba porcji: <strong>' + selectedServings + '</strong>' + servingsPickerHtml + '</div>' +
         '<div><div class="ingredients-title">Składniki</div>' + rows + '</div>' +
         (r.instructions ? '<div><div class="ingredients-title">Przygotowanie</div><div class="instructions">' + escapeHtml(r.instructions) + '</div></div>' : '') +
         '</div>';
@@ -5486,6 +5595,18 @@ function bindEvents(){
       renderRecipesPanel();
       return;
     }
+    // Przełącznik liczby porcji (2/4/6, zgłoszenie Dawida) — sprawdzamy PRZED
+    // [data-recipe-toggle] niżej, bo przycisk siedzi wewnątrz już rozwiniętej
+    // karty i inaczej klik w niego zwinąłby całą kartę zamiast przeliczyć
+    // porcje.
+    const servingsBtn = e.target.closest('[data-servings-pick]');
+    if (servingsBtn){
+      const recipeId = servingsBtn.getAttribute('data-servings-pick');
+      const value = parseInt(servingsBtn.getAttribute('data-servings-value'), 10);
+      if (recipeId && value) recipeServingsChoice[recipeId] = value;
+      renderRecipesPanel();
+      return;
+    }
     // Rozwijanie/zwijanie karty przepisu — ale nie wtedy, gdy kliknięcie
     // trafiło w przycisk "+ Dodaj do listy" WEWNĄTRZ już rozwiniętej karty
     // (ten klik obsługuje bindPriceReportDelegation powyżej, patrz data-list-toggle).
@@ -5497,9 +5618,11 @@ function bindEvents(){
       expandedRecipeIds.delete(id);
     } else {
       expandedRecipeIds.add(id);
-      // Świeży wybór "która szynka" przy każdym ponownym otwarciu karty —
-      // patrz komentarz przy deklaracji recipeIngredientChoice.
+      // Świeży wybór "która szynka" i świeża (bazowa) liczba porcji przy
+      // każdym ponownym otwarciu karty — patrz komentarz przy deklaracji
+      // recipeIngredientChoice/recipeServingsChoice.
       delete recipeIngredientChoice[id];
+      delete recipeServingsChoice[id];
     }
     renderRecipesPanel();
   });
@@ -5530,6 +5653,12 @@ function bindEvents(){
     if (name === '') recipeStoreFilter.clear();
     else if (recipeStoreFilter.has(name)) recipeStoreFilter.delete(name);
     else recipeStoreFilter.add(name);
+    recipesVisibleCount = LIST_PAGE_SIZE; // zmiana filtra -> wracamy do pierwszej strony
+    renderRecipesPanel();
+  });
+
+  document.getElementById('recipeMatchFilterToggle').addEventListener('change', (e) => {
+    recipeMinMatchFilter = e.target.checked;
     recipesVisibleCount = LIST_PAGE_SIZE; // zmiana filtra -> wracamy do pierwszej strony
     renderRecipesPanel();
   });
