@@ -1,183 +1,145 @@
 <!doctype html>
-<html lang="pl" data-palette="navy" data-font-size="small">
+<html lang="pl" data-layout="kokpit" data-font-size="small">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Grosz do Grosza</title>
 <style>
 /* ============ TOKENS ============ */
-/* Trzy kolorystyki appki (Dawid zaakceptował wszystkie trzy zaproponowane
-   warianty, więc zamiast wybierać jeden, appka pozwala użytkownikowi samemu
-   wybrać — patrz #paletteChooser/renderPaletteChooser/applyColorPalette).
-   Każda ma swój jasny i ciemny wariant; appka i tak sama dobiera jasny/ciemny
-   wg ustawień telefonu (prefers-color-scheme), tak jak wcześniej — zmienia
-   się tylko to, którą z trzech palet nakłada na wybrany tryb. Wybrana paleta
-   trafia jako atrybut data-palette na <html> (patrz applyColorPalette) —
-   domyślna wartość w samym tagu (poniżej w <head>) jest tu potrzebna, żeby
-   appka nie "mrugnęła" bez kolorów, zanim JS zdąży odczytać zapisany wybór. */
+/* Trzy LAYOUTY appki (Dawid obejrzał trzy kierunki nowego wyglądu i poprosił,
+   żeby użytkownik mógł wybrać jeden z nich — patrz LAYOUTS/applyLayout/
+   renderPaletteChooser w JS, karta "Wygląd appki" w zakładce Ustawienia).
+   Każdy layout to nie tylko kolory: ma własny krój pisma, promień
+   zaokrągleń, styl kart, "hero" z kwotą i pasek nawigacji — kolory i
+   kroje siedzą w zmiennych poniżej, a różnice w KSZTAŁCIE w sekcji
+   "LAYOUTY" na końcu tego <style>. Każdy ma jasny i ciemny wariant; appka
+   sama dobiera jasny/ciemny wg ustawień telefonu (prefers-color-scheme).
+   Wybrany layout trafia jako atrybut data-layout na <html> — domyślna
+   wartość w samym tagu jest potrzebna, żeby appka nie "mrugnęła" bez
+   kolorów, zanim JS zdąży odczytać zapisany wybór. */
 :root{ --radius:16px; }
 
 /* Wielkość fontu (3 poziomy, zgłoszenie Dawida) — wszystkie font-size w tym
    pliku są w rem (1rem = domyślne 16px), więc zmiana font-size na <html> skaluje
    proporcjonalnie kompletnie wszystkie teksty appki naraz, bez dotykania
    każdej reguły z osobna. "small" to dotychczasowy, domyślny rozmiar appki
-   (patrz #fontSizeChooser/renderFontSizeChooser/applyFontSize, karta "Wygląd
-   appki" na górze zakładki Dziś, obok wyboru kolorystyki). */
+   (patrz #fontSizeChooser/renderFontSizeChooser/applyFontSize). */
 html{ font-size:16px; }
 html[data-font-size="medium"]{ font-size:18px; }
 html[data-font-size="large"]{ font-size:20px; }
 
-:root[data-palette="navy"]{
-  --paper:#eef1f6;
-  --paper-raised:#ffffff;
-  --ink:#10203a;
-  --ink-soft:#4d5b73;
-  --ink-faint:#8894a8;
-  --accent:#c8942f;
-  --accent-ink:#241a02;
-  --accent-soft:#f3e6c6;
-  --growth:#1f7a5c;
-  --growth-soft:#dcf0e8;
-  --warn:#b3402e;
-  --warn-soft:#f4ded8;
-  --line:#d7dde6;
-  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 16px rgba(0,0,0,.05);
+/* ---- B · KOKPIT (domyślny): granat i złoto, ciemny nagłówek, płaskie listy ---- */
+:root[data-layout="kokpit"]{
+  --font-body:'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display:'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:'Manrope', system-ui, sans-serif;
+  --radius:18px; --radius-sm:12px; --radius-btn:14px;
+  --paper:#eef1f6; --paper-raised:#ffffff;
+  --ink:#10203a; --ink-soft:#4d5b73; --ink-faint:#8894a8;
+  --accent:#c8942f; --accent-ink:#241a02; --accent-soft:#f3e6c6;
+  --growth:#1f7a5c; --growth-soft:#dcf0e8;
+  --warn:#b3402e; --warn-soft:#f4ded8;
+  --line:#e6eaf0; --shadow:none;
+  --hero-bg:#10203a; --hero-ink:#eef1f6; --hero-soft:#aab4c6; --hero-accent:#e4b356; --hero-field:#1a2b48;
+  --nav-bg:#ffffff; --nav-ink:#8894a8; --nav-active:#10203a; --nav-active-bg:#f3e6c6;
 }
 @media (prefers-color-scheme: dark){
-  :root[data-palette="navy"]:not([data-theme="light"]){
-    --paper:#0b1220;
-    --paper-raised:#131c2e;
-    --ink:#eef1f6;
-    --ink-soft:#aab4c6;
-    --ink-faint:#66738a;
-    --accent:#e4b356;
-    --accent-ink:#241a02;
-    --accent-soft:#3a2f14;
-    --growth:#4fbd94;
-    --growth-soft:#163429;
-    --warn:#e2796a;
-    --warn-soft:#3a211c;
+  :root[data-layout="kokpit"]:not([data-theme="light"]){
+    --paper:#0b1220; --paper-raised:#131c2e;
+    --ink:#eef1f6; --ink-soft:#aab4c6; --ink-faint:#66738a;
+    --accent:#e4b356; --accent-ink:#241a02; --accent-soft:#3a2f14;
+    --growth:#4fbd94; --growth-soft:#163429;
+    --warn:#e2796a; --warn-soft:#3a211c;
     --line:#253046;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.35);
+    --hero-bg:#1a2b48; --hero-ink:#eef1f6; --hero-soft:#aab4c6; --hero-accent:#e4b356; --hero-field:#243553;
+    --nav-bg:#131c2e; --nav-ink:#66738a; --nav-active:#eef1f6; --nav-active-bg:#3a2f14;
   }
 }
-:root[data-palette="navy"][data-theme="dark"]{
-  --paper:#0b1220;
-  --paper-raised:#131c2e;
-  --ink:#eef1f6;
-  --ink-soft:#aab4c6;
-  --ink-faint:#66738a;
-  --accent:#e4b356;
-  --accent-ink:#241a02;
-  --accent-soft:#3a2f14;
-  --growth:#4fbd94;
-  --growth-soft:#163429;
-  --warn:#e2796a;
-  --warn-soft:#3a211c;
+:root[data-layout="kokpit"][data-theme="dark"]{
+  --paper:#0b1220; --paper-raised:#131c2e;
+  --ink:#eef1f6; --ink-soft:#aab4c6; --ink-faint:#66738a;
+  --accent:#e4b356; --accent-ink:#241a02; --accent-soft:#3a2f14;
+  --growth:#4fbd94; --growth-soft:#163429;
+  --warn:#e2796a; --warn-soft:#3a211c;
   --line:#253046;
-  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.35);
+  --hero-bg:#1a2b48; --hero-ink:#eef1f6; --hero-soft:#aab4c6; --hero-accent:#e4b356; --hero-field:#243553;
+  --nav-bg:#131c2e; --nav-ink:#66738a; --nav-active:#eef1f6; --nav-active-bg:#3a2f14;
 }
 
-:root[data-palette="mint"]{
-  --paper:#f1f8f5;
-  --paper-raised:#ffffff;
-  --ink:#12302a;
-  --ink-soft:#4d6b62;
-  --ink-faint:#8aa89d;
-  --accent:#ef7860;
-  --accent-ink:#ffffff;
-  --accent-soft:#fbe1da;
-  --growth:#189e77;
-  --growth-soft:#d7f2e6;
-  --warn:#c0392b;
-  --warn-soft:#f6dbd6;
-  --line:#d7e8e0;
-  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 16px rgba(0,0,0,.05);
+/* ---- A · GAZETKA: ciepły papier, szeryfowe liczby, linie zamiast ramek ---- */
+:root[data-layout="gazetka"]{
+  --font-body:'Nunito Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display:'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-mono:'Newsreader', Georgia, 'Times New Roman', serif;
+  --radius:0px; --radius-sm:0px; --radius-btn:0px;
+  --paper:#f7f3ea; --paper-raised:#fffdf8;
+  --ink:#15223a; --ink-soft:#4a5266; --ink-faint:#8a8375;
+  --accent:#9a6f1c; --accent-ink:#f7f3ea; --accent-soft:#efe4c8;
+  --growth:#1f6b4f; --growth-soft:#dfeae2;
+  --warn:#a8402c; --warn-soft:#f1ddd6;
+  --line:#ddd6c6; --shadow:none;
+  --hero-bg:transparent; --hero-ink:#15223a; --hero-soft:#6f6a5e; --hero-accent:#9a6f1c; --hero-field:#f7f3ea;
+  --nav-bg:#f7f3ea; --nav-ink:#8a8375; --nav-active:#15223a; --nav-active-bg:transparent;
 }
 @media (prefers-color-scheme: dark){
-  :root[data-palette="mint"]:not([data-theme="light"]){
-    --paper:#0d1a16;
-    --paper-raised:#15251f;
-    --ink:#ecf5f0;
-    --ink-soft:#9fb8ac;
-    --ink-faint:#5f7a6d;
-    --accent:#ff9280;
-    --accent-ink:#241005;
-    --accent-soft:#3d271f;
-    --growth:#4fd6a8;
-    --growth-soft:#163f31;
-    --warn:#ea9184;
-    --warn-soft:#3d221c;
-    --line:#223a30;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.35);
+  :root[data-layout="gazetka"]:not([data-theme="light"]){
+    --paper:#17150f; --paper-raised:#1f1c14;
+    --ink:#f2ede2; --ink-soft:#b9b09c; --ink-faint:#7f776a;
+    --accent:#d9a94a; --accent-ink:#17150f; --accent-soft:#3a3018;
+    --growth:#5fbd93; --growth-soft:#1c3328;
+    --warn:#e08b78; --warn-soft:#3b221c;
+    --line:#37321f;
+    --hero-bg:transparent; --hero-ink:#f2ede2; --hero-soft:#b9b09c; --hero-accent:#d9a94a; --hero-field:#17150f;
+    --nav-bg:#17150f; --nav-ink:#7f776a; --nav-active:#f2ede2; --nav-active-bg:transparent;
   }
 }
-:root[data-palette="mint"][data-theme="dark"]{
-  --paper:#0d1a16;
-  --paper-raised:#15251f;
-  --ink:#ecf5f0;
-  --ink-soft:#9fb8ac;
-  --ink-faint:#5f7a6d;
-  --accent:#ff9280;
-  --accent-ink:#241005;
-  --accent-soft:#3d271f;
-  --growth:#4fd6a8;
-  --growth-soft:#163f31;
-  --warn:#ea9184;
-  --warn-soft:#3d221c;
-  --line:#223a30;
-  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.35);
+:root[data-layout="gazetka"][data-theme="dark"]{
+  --paper:#17150f; --paper-raised:#1f1c14;
+  --ink:#f2ede2; --ink-soft:#b9b09c; --ink-faint:#7f776a;
+  --accent:#d9a94a; --accent-ink:#17150f; --accent-soft:#3a3018;
+  --growth:#5fbd93; --growth-soft:#1c3328;
+  --warn:#e08b78; --warn-soft:#3b221c;
+  --line:#37321f;
+  --hero-bg:transparent; --hero-ink:#f2ede2; --hero-soft:#b9b09c; --hero-accent:#d9a94a; --hero-field:#17150f;
+  --nav-bg:#17150f; --nav-ink:#7f776a; --nav-active:#f2ede2; --nav-active-bg:transparent;
 }
 
-:root[data-palette="plum"]{
-  --paper:#f5eef2;
-  --paper-raised:#ffffff;
-  --ink:#2c1a2b;
-  --ink-soft:#6b5468;
-  --ink-faint:#a189a0;
-  --accent:#c46a2e;
-  --accent-ink:#ffffff;
-  --accent-soft:#f2ded0;
-  --growth:#4c7a3f;
-  --growth-soft:#e2ecda;
-  --warn:#a8354f;
-  --warn-soft:#f3dae1;
-  --line:#e3d5e0;
-  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 16px rgba(0,0,0,.05);
+/* ---- C · CIEPŁA KUCHNIA: zaokrąglone pastelowe kafelki, pływający pasek ---- */
+:root[data-layout="kuchnia"]{
+  --font-body:'Outfit', 'Trebuchet MS', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display:'Outfit', 'Trebuchet MS', system-ui, sans-serif;
+  --font-mono:'Outfit', 'Trebuchet MS', system-ui, sans-serif;
+  --radius:26px; --radius-sm:16px; --radius-btn:20px;
+  --paper:#fbf6ee; --paper-raised:#ffffff;
+  --ink:#2b2419; --ink-soft:#6b5f4d; --ink-faint:#a3937b;
+  --accent:#d9a52c; --accent-ink:#2b2419; --accent-soft:#ffe7b3;
+  --growth:#2f7a4f; --growth-soft:#e4efe4;
+  --warn:#b5561f; --warn-soft:#fde4dc;
+  --line:#f1e6d6; --shadow:none;
+  --hero-bg:#f3c85a; --hero-ink:#3a2a05; --hero-soft:#7a5210; --hero-accent:#3a2a05; --hero-field:#f7d67e;
+  --nav-bg:#2b2419; --nav-ink:#a3937b; --nav-active:#3a2a05; --nav-active-bg:#f3c85a;
 }
 @media (prefers-color-scheme: dark){
-  :root[data-palette="plum"]:not([data-theme="light"]){
-    --paper:#1a1219;
-    --paper-raised:#241a23;
-    --ink:#f2e8f0;
-    --ink-soft:#b79fb4;
-    --ink-faint:#705d6d;
-    --accent:#e08c4f;
-    --accent-ink:#241505;
-    --accent-soft:#3d2a1c;
-    --growth:#7fbf6a;
-    --growth-soft:#223a1c;
-    --warn:#d9738c;
-    --warn-soft:#3d2029;
-    --line:#332533;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.35);
+  :root[data-layout="kuchnia"]:not([data-theme="light"]){
+    --paper:#1c1712; --paper-raised:#262019;
+    --ink:#f6efe4; --ink-soft:#c4b7a4; --ink-faint:#857863;
+    --accent:#f0c65a; --accent-ink:#2b2419; --accent-soft:#4a3a12;
+    --growth:#6cc493; --growth-soft:#21362a;
+    --warn:#f09a7c; --warn-soft:#452520;
+    --line:#3a3127;
+    --hero-bg:#c9a03a; --hero-ink:#1c1712; --hero-soft:#4a3a12; --hero-accent:#1c1712; --hero-field:#d9b054;
+    --nav-bg:#0f0c09; --nav-ink:#857863; --nav-active:#1c1712; --nav-active-bg:#f0c65a;
   }
 }
-:root[data-palette="plum"][data-theme="dark"]{
-  --paper:#1a1219;
-  --paper-raised:#241a23;
-  --ink:#f2e8f0;
-  --ink-soft:#b79fb4;
-  --ink-faint:#705d6d;
-  --accent:#e08c4f;
-  --accent-ink:#241505;
-  --accent-soft:#3d2a1c;
-  --growth:#7fbf6a;
-  --growth-soft:#223a1c;
-  --warn:#d9738c;
-  --warn-soft:#3d2029;
-  --line:#332533;
-  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.35);
+:root[data-layout="kuchnia"][data-theme="dark"]{
+  --paper:#1c1712; --paper-raised:#262019;
+  --ink:#f6efe4; --ink-soft:#c4b7a4; --ink-faint:#857863;
+  --accent:#f0c65a; --accent-ink:#2b2419; --accent-soft:#4a3a12;
+  --growth:#6cc493; --growth-soft:#21362a;
+  --warn:#f09a7c; --warn-soft:#452520;
+  --line:#3a3127;
+  --hero-bg:#c9a03a; --hero-ink:#1c1712; --hero-soft:#4a3a12; --hero-accent:#1c1712; --hero-field:#d9b054;
+  --nav-bg:#0f0c09; --nav-ink:#857863; --nav-active:#1c1712; --nav-active-bg:#f0c65a;
 }
 
 /* ============ BASE ============ */
@@ -185,7 +147,7 @@ html[data-font-size="large"]{ font-size:20px; }
 body{
   background:var(--paper);
   color:var(--ink);
-  font-family:'Karla', system-ui, sans-serif;
+  font-family:var(--font-body);
   -webkit-font-smoothing:antialiased;
   display:flex;
   justify-content:center;
@@ -200,12 +162,12 @@ body{
   padding-bottom:84px;
 }
 h1,h2,h3,.num-display{
-  font-family:'Fraunces', Georgia, serif;
+  font-family:var(--font-display);
   text-wrap:balance;
   margin:0;
 }
 .mono, .tabular{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-family:var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 a{color:var(--accent);}
@@ -219,7 +181,7 @@ button{font-family:inherit;}
   padding:20px 20px 8px;
 }
 .topbar .brand{
-  font-family:'Fraunces', serif;
+  font-family:var(--font-display);
   font-size:1.25rem;
   font-weight:600;
   display:flex;
@@ -245,6 +207,7 @@ button{font-family:inherit;}
   border-radius:var(--radius);
   padding:18px;
   box-shadow:var(--shadow);
+  overflow-wrap:anywhere;
   display:flex;
   flex-direction:column;
   gap:12px;
@@ -252,7 +215,7 @@ button{font-family:inherit;}
 .card h2{font-size:0.9375rem; font-weight:600; letter-spacing:.01em;}
 .card h2 .sub{
   display:block;
-  font-family:'Karla', sans-serif;
+  font-family:var(--font-body);
   font-size:0.75rem;
   font-weight:400;
   color:var(--ink-soft);
@@ -269,7 +232,7 @@ button{font-family:inherit;}
   border:1px solid var(--line);
   background:var(--paper);
   color:var(--ink-soft);
-  font-family:'Karla', sans-serif;
+  font-family:var(--font-body);
   font-size:0.75rem; font-weight:700;
   display:flex; align-items:center; justify-content:center;
   cursor:pointer;
@@ -281,76 +244,85 @@ button{font-family:inherit;}
 .info-box{
   background:var(--accent-soft);
   color:var(--ink);
-  border-radius:10px;
+  border-radius:var(--radius-sm);
   padding:10px 12px;
   font-size:0.78125rem;
   line-height:1.55;
 }
 
-/* ============ PRIVACY STRIP (widoczny na każdej zakładce) ============ */
+/* ============ PRIVACY (karta w Ustawieniach) ============ */
 .privacy-strip{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin:0 20px 4px;
-  padding:8px 12px;
+  display:flex; align-items:center; gap:8px;
+  padding:10px 12px;
   background:var(--growth-soft);
-  border:1px solid var(--line);
-  border-radius:10px;
-  font-size:0.75rem;
-  color:var(--ink-soft);
+  border-radius:var(--radius-sm);
+  font-size:0.8125rem;
+  color:var(--ink);
 }
 .privacy-strip span{flex:1; line-height:1.4;}
-.privacy-strip .info-btn{background:var(--paper-raised);}
-#privacyInfoBox{margin:0 20px 8px;}
 
 /* ============ HERO (Dziś) ============ */
+/* Wspólny szkielet; każdy layout maluje go po swojemu (sekcja LAYOUTY). */
 .hero{
-  background: linear-gradient(155deg, var(--growth-soft), var(--paper-raised) 65%);
-  border:1px solid var(--line);
-  border-radius:20px;
-  padding:26px 20px;
-  box-shadow:var(--shadow);
-  text-align:center;
+  background:var(--hero-bg);
+  color:var(--hero-ink);
+  border-radius:22px;
+  padding:22px 22px 24px;
+  display:flex; flex-direction:column; gap:6px;
 }
+.hero .hero-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
 .hero .eyebrow{
   font-size:0.75rem;
+  font-weight:700;
   text-transform:uppercase;
-  letter-spacing:.08em;
-  color:var(--ink-soft);
+  letter-spacing:.1em;
+  color:var(--hero-soft);
 }
+.hero .info-btn{background:transparent; border-color:var(--hero-soft); color:var(--hero-soft);}
 .hero .amount{
+  font-family:var(--font-display);
   font-size:3.25rem;
-  font-weight:600;
-  line-height:1.05;
-  margin:8px 0 4px;
+  font-weight:800;
+  line-height:1;
+  letter-spacing:-.03em;
+  margin:4px 0 6px;
+  color:var(--hero-accent);
   font-variant-numeric: tabular-nums;
 }
-.hero .amount .zl{font-size:1.625rem; font-weight:500; opacity:.7;}
-.hero .caption{font-size:0.8125rem; color:var(--ink-soft);}
-.hero.warn{background: linear-gradient(155deg, var(--warn-soft), var(--paper-raised) 65%);}
+.hero .amount .zl{font-size:1.25rem; font-weight:600; letter-spacing:0; opacity:.85;}
+.hero .hero-progress{display:flex; align-items:center; gap:10px; margin:2px 0 4px;}
+.hero .hero-progress[hidden]{display:none;}
+.hero .hero-progress .track{flex:1; height:6px; border-radius:3px; background:var(--hero-field); overflow:hidden;}
+.hero .hero-progress .bar{height:100%; width:0; border-radius:3px; background:var(--hero-accent);}
+.hero .hero-progress .lbl{font-size:0.71875rem; font-weight:600; color:var(--hero-soft); white-space:nowrap;}
+.hero .caption{font-size:0.8125rem; line-height:1.45; color:var(--hero-soft);}
+.hero.warn .amount{color:var(--warn);}
 
 /* form elements */
 .field{display:flex; flex-direction:column; gap:6px;}
 .field label{font-size:0.75rem; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;}
-.field input, .field textarea, .field select{
-  font-family:'JetBrains Mono', monospace;
+/* Wspólny wygląd WSZYSTKICH pól (nie tylko tych w .field) — każdy layout
+   nadpisuje go po swojemu w sekcji LAYOUTY. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]), textarea, select{
+  font-family:var(--font-mono);
   font-size:0.9375rem;
   padding:10px 12px;
-  border-radius:10px;
+  border-radius:var(--radius-sm);
   border:1px solid var(--line);
   background:var(--paper);
   color:var(--ink);
-  width:100%;
+  max-width:100%;
 }
-.field textarea{font-family:'JetBrains Mono', monospace; min-height:110px; resize:vertical;}
+.field input, .field textarea, .field select{width:100%;}
+.field textarea{font-family:var(--font-mono); min-height:110px; resize:vertical;}
 .row{display:flex; gap:10px;}
 .row > *{flex:1;}
 .hint{font-size:0.75rem; color:var(--ink-faint); line-height:1.5;}
 
 button.btn{
   border:none;
-  border-radius:12px;
+  border-radius:var(--radius-btn);
+  white-space:nowrap;
   padding:12px 16px;
   font-size:0.875rem;
   font-weight:600;
@@ -368,7 +340,7 @@ button.btn-primary{background:var(--accent); color:var(--accent-ink);}
 button.btn-ghost{background:transparent; color:var(--ink); border:1px solid var(--line);}
 button.btn-danger-ghost{background:transparent; color:var(--warn); border:1px solid var(--warn);}
 button.btn-block{width:100%;}
-button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
+button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radius-btn) * .75);}
 
 /* list rows (fixed costs, stores) */
 .list-row{
@@ -381,7 +353,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 }
 .list-row:last-child{border-bottom:none;}
 .list-row .name{font-size:0.875rem;}
-.list-row .amount{font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums;}
+.list-row .amount{font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
 .list-row .remove{
   background:none; border:none; color:var(--ink-faint); cursor:pointer; font-size:1rem; line-height:1; padding:4px;
 }
@@ -396,7 +368,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .preset-row:last-child{border-bottom:none;}
 .preset-row .name{font-size:0.84375rem; flex:1;}
 .preset-row input{
-  font-family:'JetBrains Mono', monospace;
+  font-family:var(--font-mono);
   width:96px; flex:none; text-align:right;
   padding:7px 10px; border-radius:9px; border:1px solid var(--line);
   background:var(--paper); color:var(--ink); font-size:0.875rem;
@@ -450,7 +422,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 }
 .store-card .head{display:flex; justify-content:space-between; align-items:center;}
 .store-card .head .name{font-weight:600; font-size:0.875rem;}
-.store-card .dist{font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--ink-soft);}
+.store-card .dist{font-family:var(--font-mono); font-size:0.75rem; color:var(--ink-soft);}
 .store-card .source{font-size:0.71875rem; color:var(--ink-faint);}
 .store-card .actions{display:flex; gap:8px;}
 
@@ -461,11 +433,11 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
   padding:10px 2px 6px; border-bottom:2px solid var(--line); margin-bottom:2px;
 }
 .store-group .store-head .sname{font-weight:700; font-size:0.875rem;}
-.store-group .store-head .sdist{font-size:0.6875rem; color:var(--ink-soft); font-family:'JetBrains Mono',monospace;}
+.store-group .store-head .sdist{font-size:0.6875rem; color:var(--ink-soft); font-family:var(--font-mono);}
 .product-row{display:flex; flex-wrap:wrap; justify-content:space-between; padding:7px 2px; border-bottom:1px dashed var(--line); font-size:0.84375rem;}
 .product-row:last-child{border-bottom:none;}
 .product-row .pname{flex:1; padding-right:8px;}
-.product-row .pprice{font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.product-row .pprice{font-family:var(--font-mono); font-variant-numeric:tabular-nums; white-space:nowrap;}
 .product-row .pmeta{flex-basis:100%; font-size:0.6875rem; color:var(--ink-faint); margin-top:2px;}
 .product-row .pmeta .expired{color:var(--warn);}
 .product-row .pmeta .expiring-soon{color:var(--warn); font-weight:700;}
@@ -475,20 +447,20 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
    naraz (patrz ingredientChoiceKey/renderRecipesPanel) — osobna linia nad
    resztą wiersza produktu, jak inne linie .product-row (flex-basis:100%). */
 .product-row .ingredient-pick{flex-basis:100%; margin:2px 0;}
-.product-row .ingredient-pick select{width:100%; font-family:'JetBrains Mono', monospace; font-size:0.75rem; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink);}
+.product-row .ingredient-pick select{width:100%; font-family:var(--font-mono); font-size:0.75rem; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink);}
 
 /* karty przepisów (zakładka Przepisy) — patrz renderRecipesPanel */
 .recipe-card{border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;}
 .recipe-card .head{display:flex; justify-content:space-between; align-items:center; gap:10px; cursor:pointer;}
 .recipe-card .head .name{font-weight:600; font-size:0.875rem;}
-.recipe-card .match-badge{font-size:0.71875rem; color:var(--ink-soft); white-space:nowrap; font-family:'JetBrains Mono',monospace;}
+.recipe-card .match-badge{font-size:0.71875rem; color:var(--ink-soft); white-space:nowrap; font-family:var(--font-mono);}
 .recipe-card .match-badge.full{color:var(--growth); font-weight:700;}
 .recipe-card .body{display:flex; flex-direction:column; gap:10px;}
 .recipe-card .servings{font-size:0.75rem; color:var(--ink-faint); display:flex; align-items:center; flex-wrap:wrap; gap:6px;}
 .recipe-card .servings strong{color:var(--ink);}
 .recipe-card .servings-picker{display:inline-flex; gap:4px;}
 .recipe-card .servings-picker button{
-  font-family:'JetBrains Mono', monospace; font-size:0.6875rem; padding:2px 9px;
+  font-family:var(--font-mono); font-size:0.6875rem; padding:2px 9px;
   border-radius:999px; border:1px solid var(--line); background:var(--paper); color:var(--ink-soft); cursor:pointer;
 }
 .recipe-card .servings-picker button.active{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
@@ -512,14 +484,14 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .ingredient-item.missing{border-left-color:var(--warn);}
 .ingredient-item .ing-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
 .ingredient-item .ing-num{
-  flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink);
+  flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent-soft); color:var(--ink);
   font-size:0.6875rem; font-weight:700; display:flex; align-items:center; justify-content:center;
-  font-family:'JetBrains Mono',monospace;
+  font-family:var(--font-mono);
 }
 .ingredient-item .ing-name{font-weight:700; font-size:0.84375rem; color:var(--ink);}
 .ingredient-item .ing-amount{
   font-size:0.6875rem; color:var(--ink-soft); background:var(--paper); border:1px solid var(--line);
-  border-radius:999px; padding:1px 8px; font-family:'JetBrains Mono',monospace; white-space:nowrap;
+  border-radius:999px; padding:1px 8px; font-family:var(--font-mono); white-space:nowrap;
 }
 .ingredient-item .product-row{margin-top:6px;}
 .missing-ingredient{margin-top:4px; padding:0; border-bottom:none;}
@@ -527,7 +499,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 
 /* ============ KALENDARZ WYDATKÓW (Dziś) ============ */
 .cal-nav{display:flex; align-items:center; justify-content:space-between;}
-.cal-nav strong{font-family:'Fraunces', serif; font-size:0.9375rem; text-transform:capitalize;}
+.cal-nav strong{font-family:var(--font-display); font-size:0.9375rem; text-transform:capitalize;}
 .cal-weekdays{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; font-size:0.625rem; color:var(--ink-faint); text-align:center;}
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
 .cal-cell{
@@ -537,7 +509,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
   border:1px solid var(--line);
   border-radius:8px;
   background:var(--paper);
-  font-family:'JetBrains Mono', monospace;
+  font-family:var(--font-mono);
   color:var(--ink);
   padding:2px;
   cursor:pointer;
@@ -553,7 +525,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 /* filtr sklepów nad "Co dziś kupisz" */
 .chip-row{display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 12px;}
 .chip{
-  font-family:'Karla', sans-serif; font-size:0.78125rem; padding:5px 12px;
+  font-family:var(--font-body); font-size:0.78125rem; padding:5px 12px;
   border-radius:999px; border:1px solid var(--line); background:var(--paper);
   color:var(--ink-soft); cursor:pointer;
 }
@@ -587,26 +559,28 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .category-check-row input{width:auto; margin:0;}
 .category-dropdown-apply{margin-top:4px;}
 
-/* wybór kolorystyki appki (patrz #paletteChooser/renderPaletteChooser) */
-.palette-row{display:flex; gap:10px; flex-wrap:wrap;}
-.palette-option{
-  flex:1; min-width:84px; display:flex; flex-direction:column; align-items:center; gap:6px;
-  padding:10px 8px; border-radius:12px; border:2px solid var(--line); background:var(--paper);
-  cursor:pointer; font-family:'Karla', sans-serif; color:var(--ink-soft); font-size:0.71875rem;
+/* wybór layoutu appki (patrz #paletteChooser/renderPaletteChooser/LAYOUTS) */
+.layout-row{display:flex; flex-direction:column; gap:8px;}
+.layout-option{
+  display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:12px; row-gap:2px; align-items:center;
+  padding:12px 14px; border-radius:var(--radius-sm); border:2px solid var(--line); background:var(--paper);
+  cursor:pointer; font-family:var(--font-body); color:var(--ink-soft); text-align:left;
 }
-.palette-option.active{border-color:var(--accent); color:var(--ink); font-weight:600;}
-.palette-option .swatches{display:flex; gap:3px;}
-.palette-option .swatches span{width:16px; height:16px; border-radius:50%; border:1px solid rgba(0,0,0,.12);}
+.layout-option.active{border-color:var(--accent); color:var(--ink);}
+.layout-option .swatches{grid-row:1 / span 2; display:flex; gap:3px;}
+.layout-option .swatches span{width:18px; height:18px; border-radius:50%; border:1px solid rgba(0,0,0,.12);}
+.layout-option .layout-name{font-weight:700; font-size:0.875rem; color:var(--ink);}
+.layout-option .layout-desc{font-size:0.71875rem; line-height:1.4;}
 
 /* wybór wielkości fontu appki (patrz #fontSizeChooser/renderFontSizeChooser) */
-.fontsize-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+.fontsize-row{display:flex; gap:10px; flex-wrap:wrap;}
 .fontsize-option{
   flex:1; min-width:84px; display:flex; flex-direction:column; align-items:center; gap:2px;
   padding:10px 8px; border-radius:12px; border:2px solid var(--line); background:var(--paper);
-  cursor:pointer; font-family:'Karla', sans-serif; color:var(--ink-soft);
+  cursor:pointer; font-family:var(--font-body); color:var(--ink-soft);
 }
 .fontsize-option.active{border-color:var(--accent); color:var(--ink); font-weight:600;}
-.fontsize-option .fontsize-sample{font-family:'Fraunces', serif; font-weight:700; line-height:1;}
+.fontsize-option .fontsize-sample{font-family:var(--font-display); font-weight:700; line-height:1;}
 .fontsize-option[data-fontsize-choice="small"] .fontsize-sample{font-size:1rem;}
 .fontsize-option[data-fontsize-choice="medium"] .fontsize-sample{font-size:1.25rem;}
 .fontsize-option[data-fontsize-choice="large"] .fontsize-sample{font-size:1.5rem;}
@@ -615,20 +589,20 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 /* zgłaszanie i ocenianie ceny produktu */
 .preport-link{
   flex-basis:100%; align-self:flex-start; background:none; border:none; padding:0;
-  margin-top:3px; font-family:'Karla', sans-serif; font-size:0.71875rem;
+  margin-top:3px; font-family:var(--font-body); font-size:0.71875rem;
   color:var(--accent); text-decoration:underline; cursor:pointer;
 }
 .preport{flex-basis:100%; display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px; font-size:0.71875rem; color:var(--ink-faint);}
 .preport-form{flex-basis:100%; display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px;}
 .preport-input{
-  font-family:'JetBrains Mono', monospace; font-size:0.8125rem; padding:6px 8px;
+  font-family:var(--font-mono); font-size:0.8125rem; padding:6px 8px;
   border-radius:8px; border:1px solid var(--line); background:var(--paper);
   color:var(--ink); width:88px;
 }
-.preport-input-wide{width:100%; flex-basis:100%; font-family:'Karla', sans-serif;}
+.preport-input-wide{width:100%; flex-basis:100%; font-family:var(--font-body);}
 .list-toggle-wrap{flex-basis:100%; margin-top:4px;}
 .list-toggle-btn{
-  font-family:'Karla', sans-serif; font-size:0.71875rem; font-weight:600;
+  font-family:var(--font-body); font-size:0.71875rem; font-weight:600;
   padding:5px 10px; border-radius:999px; border:1px solid var(--line);
   background:var(--paper); color:var(--ink-soft); cursor:pointer;
 }
@@ -637,7 +611,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
    toggleRecipeExclusion/state.recipeExclusions. Ten sam rząd co "+ Dodaj do
    listy", żeby obie akcje przy produkcie były razem, blisko siebie. */
 .excl-btn{
-  font-family:'Karla', sans-serif; font-size:0.71875rem; font-weight:600;
+  font-family:var(--font-body); font-size:0.71875rem; font-weight:600;
   padding:5px 10px; border-radius:999px; border:1px solid var(--line);
   background:var(--paper); color:var(--warn); cursor:pointer; margin-top:4px;
 }
@@ -645,7 +619,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .excl-chip{display:inline-flex; align-items:center; gap:4px; background:var(--paper); border:1px solid var(--line); border-radius:999px; padding:2px 4px 2px 8px; margin:0 4px 4px 0;}
 .excl-chip button{border:none; background:none; color:var(--growth); cursor:pointer; font-size:0.8125rem; padding:2px 4px;}
 .vote-btn{
-  font-family:'Karla', sans-serif; font-size:0.71875rem; padding:3px 8px;
+  font-family:var(--font-body); font-size:0.71875rem; padding:3px 8px;
   border-radius:999px; border:1px solid var(--line); background:var(--paper);
   color:var(--ink-soft); cursor:pointer;
 }
@@ -659,7 +633,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 }
 .manage-product-row.editing{background:var(--paper-raised);}
 .manage-product-row .mp-main{display:flex; justify-content:space-between; align-items:baseline; font-size:0.875rem; font-weight:600;}
-.manage-product-row .mp-price{font-family:'JetBrains Mono',monospace; white-space:nowrap;}
+.manage-product-row .mp-price{font-family:var(--font-mono); white-space:nowrap;}
 .manage-product-row .mp-meta{font-size:0.75rem; color:var(--ink-soft);}
 .manage-product-row .field label{font-size:0.65625rem;}
 .manage-product-row .row{gap:8px;}
@@ -740,20 +714,23 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 nav.tabbar{
   position:fixed; bottom:0; left:50%; transform:translateX(-50%);
   width:100%; max-width:480px;
-  background:var(--paper-raised);
+  background:var(--nav-bg);
   border-top:1px solid var(--line);
   display:flex;
-  padding:8px 4px calc(8px + env(safe-area-inset-bottom));
-  box-shadow: 0 -2px 12px rgba(0,0,0,.05);
+  padding:8px 6px calc(8px + env(safe-area-inset-bottom));
   z-index:40;
 }
 .tab{
   flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
-  background:none; border:none; cursor:pointer; padding:6px 2px;
-  color:var(--ink-faint); font-size:0.625rem; letter-spacing:.02em;
+  background:none; border:none; cursor:pointer; padding:4px 2px;
+  color:var(--nav-ink); font-family:var(--font-body); font-size:0.6875rem; font-weight:700; letter-spacing:.02em;
 }
-.tab .icon{font-size:1.1875rem; line-height:1;}
-.tab.active{color:var(--accent);}
+.tab .icon{display:flex; align-items:center; justify-content:center; width:52px; height:30px; border-radius:15px; line-height:1;}
+.tab .icon svg{width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.tab.active{color:var(--nav-active);}
+.tab.active .icon{background:var(--nav-active-bg);}
+.more-tab-item .icon{display:inline-flex; width:20px; height:20px;}
+.more-tab-item .icon svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round;}
 
 /* Rozwijane menu "Więcej" (patrz #moreTabBtn/#moreTabMenu) — ten sam wzorzec
    pływającej karty co #contactBubblePanel: position:fixed nad paskiem
@@ -765,15 +742,15 @@ nav.tabbar{
      widoczny na każdej zakładce w tym samym, prawym rogu ekranu. */
   position:fixed; right:8px; width:min(260px, calc(100vw - 16px));
   bottom:calc(136px + env(safe-area-inset-bottom));
-  background:var(--paper-raised); border:1px solid var(--line); border-radius:12px;
-  box-shadow:var(--shadow); padding:6px; z-index:41;
+  background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-sm);
+  box-shadow:0 8px 24px rgba(0,0,0,.14); padding:6px; z-index:41;
   display:flex; flex-direction:column; gap:2px;
 }
 #moreTabMenu[hidden]{display:none;}
 .more-tab-item{
   display:flex; align-items:center; gap:8px; width:100%; text-align:left;
   background:none; border:none; cursor:pointer; padding:10px; border-radius:8px;
-  color:var(--ink); font-family:'Karla', sans-serif; font-size:0.875rem;
+  color:var(--ink); font-family:var(--font-body); font-size:0.875rem;
 }
 .more-tab-item:active{background:var(--paper);}
 .more-tab-item.active{color:var(--accent); font-weight:600;}
@@ -783,11 +760,126 @@ nav.tabbar{
 .faq-item h3{font-size:0.9375rem; margin:0 0 4px;}
 .faq-item p{margin:0; font-size:0.84375rem; line-height:1.5; color:var(--ink-soft);}
 
+
+/* ============ LAYOUTY (różnice w kształcie; kolory i kroje — patrz TOKENS) ============ */
+
+/* ---- B · KOKPIT ---- */
+:root[data-layout="kokpit"] .topbar{
+  background:var(--hero-bg); color:var(--hero-ink);
+  align-items:center; padding:18px 22px 16px; margin-bottom:8px;
+  border-radius:0 0 28px 28px;
+}
+:root[data-layout="kokpit"] .topbar .brand{color:var(--hero-ink); font-weight:800; font-size:1.0625rem;}
+:root[data-layout="kokpit"] .topbar .date{color:var(--hero-soft); text-transform:none; letter-spacing:0; font-weight:600; font-size:0.8125rem;}
+/* Na Dziś nagłówek i hero zlewają się w jeden ciemny blok (jak na makiecie). */
+:root[data-layout="kokpit"] body:has(.panel[data-panel="dzis"].active) .topbar{border-radius:0; margin-bottom:0;}
+:root[data-layout="kokpit"] .panel[data-panel="dzis"] .hero{margin:-8px -20px 6px; border-radius:0 0 28px 28px; padding:4px 22px 26px;}
+:root[data-layout="kokpit"] .card{border:none;}
+:root[data-layout="kokpit"] .card h2{font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--ink-soft);}
+:root[data-layout="kokpit"] .card h2 .sub{text-transform:none; letter-spacing:0; font-weight:400; margin-top:4px;}
+:root[data-layout="kokpit"] .hero .amount{font-size:2.875rem;}
+:root[data-layout="kokpit"] button.btn-ghost{background:var(--paper); border:none;}
+:root[data-layout="kokpit"] .chip{border:none; background:var(--paper); font-weight:700;}
+:root[data-layout="kokpit"] .chip.active{background:var(--accent); color:var(--accent-ink);}
+:root[data-layout="kokpit"] .recipe-card, :root[data-layout="kokpit"] .store-card, :root[data-layout="kokpit"] .manage-product-row{border:none; background:var(--paper); border-radius:var(--radius);}
+:root[data-layout="kokpit"] .ingredient-item{border:none; border-left:3px solid var(--line); border-radius:var(--radius-sm);}
+:root[data-layout="kokpit"] .info-btn{border:none; background:var(--paper);}
+:root[data-layout="kokpit"] .hero .info-btn{background:var(--hero-field); border:none; color:var(--hero-ink);}
+
+/* ---- A · GAZETKA ---- */
+:root[data-layout="gazetka"] .card, :root[data-layout="gazetka"] .hero, :root[data-layout="gazetka"] .recipe-card,
+:root[data-layout="gazetka"] .ingredient-item, :root[data-layout="gazetka"] .store-card, :root[data-layout="gazetka"] .trophy,
+:root[data-layout="gazetka"] .cal-cell, :root[data-layout="gazetka"] .chip, :root[data-layout="gazetka"] .pill,
+:root[data-layout="gazetka"] button.btn, :root[data-layout="gazetka"] .field input, :root[data-layout="gazetka"] .field textarea,
+:root[data-layout="gazetka"] .field select, :root[data-layout="gazetka"] .info-box, :root[data-layout="gazetka"] .privacy-strip,
+:root[data-layout="gazetka"] #moreTabMenu, :root[data-layout="gazetka"] .more-tab-item, :root[data-layout="gazetka"] #contactBubblePanel,
+:root[data-layout="gazetka"] .layout-option, :root[data-layout="gazetka"] .fontsize-option, :root[data-layout="gazetka"] .list-toggle-btn,
+:root[data-layout="gazetka"] .excl-btn, :root[data-layout="gazetka"] .excl-chip, :root[data-layout="gazetka"] .vote-btn,
+:root[data-layout="gazetka"] .preport-input, :root[data-layout="gazetka"] .manage-product-row, :root[data-layout="gazetka"] .category-dropdown-panel,
+:root[data-layout="gazetka"] .chart-bar .bar, :root[data-layout="gazetka"] .tab .icon, :root[data-layout="gazetka"] .recipe-card .servings-picker button,
+:root[data-layout="gazetka"] .ingredient-item .ing-amount, :root[data-layout="gazetka"] .medal{border-radius:0;}
+:root[data-layout="gazetka"] .topbar{margin:0 20px; padding:24px 0 12px; border-bottom:1px solid var(--ink);}
+:root[data-layout="gazetka"] .topbar .brand{font-weight:500; font-size:1.375rem;}
+:root[data-layout="gazetka"] .topbar .date{font-weight:700; color:var(--ink-faint);}
+:root[data-layout="gazetka"] .panel{gap:0; padding-top:4px;}
+:root[data-layout="gazetka"] .card{background:transparent; border:none; border-top:1px solid var(--line); padding:20px 0 22px;}
+:root[data-layout="gazetka"] .panel > .card:first-child, :root[data-layout="gazetka"] .hero + .card, :root[data-layout="gazetka"] .info-box + .card{border-top:none;}
+:root[data-layout="gazetka"] .card h2{font-family:var(--font-display); font-size:1.3125rem; font-weight:500; letter-spacing:0;}
+:root[data-layout="gazetka"] .card h2 .sub{font-size:0.8125rem; margin-top:4px;}
+:root[data-layout="gazetka"] .hero{padding:16px 0 18px; border-bottom:1px solid var(--line);}
+:root[data-layout="gazetka"] .hero .eyebrow{letter-spacing:.12em;}
+:root[data-layout="gazetka"] .hero .amount{font-size:4.5rem; font-weight:500; letter-spacing:-.03em; color:var(--ink);}
+:root[data-layout="gazetka"] .hero .amount .zl{font-size:1.75rem; font-style:italic; font-weight:400; color:var(--accent); opacity:1;}
+:root[data-layout="gazetka"] .hero .hero-progress .track{height:3px; background:var(--line);}
+:root[data-layout="gazetka"] .hero .hero-progress .bar{background:var(--accent);}
+:root[data-layout="gazetka"] .hero .info-btn{border:1px solid var(--line); color:var(--ink-soft);}
+:root[data-layout="gazetka"] button.btn-primary{background:var(--ink); color:var(--paper);}
+:root[data-layout="gazetka"] button.btn-ghost{border-color:var(--ink);}
+:root[data-layout="gazetka"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]), :root[data-layout="gazetka"] textarea, :root[data-layout="gazetka"] select{border:none; border-bottom:1px solid var(--ink); background:transparent; padding:8px 2px;}
+:root[data-layout="gazetka"] select{border:1px solid var(--line); padding:8px;}
+:root[data-layout="gazetka"] .chip{border:none; border-bottom:2px solid transparent; background:transparent; padding:6px 2px; margin-right:8px; font-weight:700; font-size:0.875rem;}
+:root[data-layout="gazetka"] .chip.active{background:transparent; color:var(--ink); border-bottom-color:var(--accent);}
+:root[data-layout="gazetka"] .recipe-card{border:none; border-top:1px solid var(--ink); padding:16px 0 20px;}
+:root[data-layout="gazetka"] .recipe-card .head .name{font-family:var(--font-display); font-size:1.375rem; font-weight:500; line-height:1.15;}
+:root[data-layout="gazetka"] .ingredient-item{border:none; border-bottom:1px dotted var(--line); background:transparent; padding:8px 0;}
+:root[data-layout="gazetka"] .store-card, :root[data-layout="gazetka"] .manage-product-row{border:none; border-top:1px solid var(--line); padding:12px 0;}
+:root[data-layout="gazetka"] nav.tabbar{border-top:1px solid var(--ink);}
+:root[data-layout="gazetka"] .tab{text-transform:uppercase; font-size:0.625rem; letter-spacing:.06em;}
+:root[data-layout="gazetka"] .tab .icon svg{stroke-width:1.75;}
+:root[data-layout="gazetka"] .list-row .amount, :root[data-layout="gazetka"] .product-row .pprice, :root[data-layout="gazetka"] .manage-product-row .mp-price{font-size:1.0625rem;}
+:root[data-layout="gazetka"] #contactBubbleBtn{border-radius:0; background:var(--ink); color:var(--paper);}
+
+/* ---- C · CIEPŁA KUCHNIA ---- */
+:root[data-layout="kuchnia"] #app{padding-bottom:110px;}
+:root[data-layout="kuchnia"] .topbar{align-items:center; padding:22px 22px 10px;}
+:root[data-layout="kuchnia"] .topbar .brand{font-weight:800; font-size:1.375rem; letter-spacing:-.02em;}
+:root[data-layout="kuchnia"] .topbar .date{text-transform:none; letter-spacing:0; font-weight:600; font-size:0.8125rem;}
+:root[data-layout="kuchnia"] .panel{padding-left:18px; padding-right:18px;}
+:root[data-layout="kuchnia"] .card{border:2px solid var(--line); padding:18px;}
+:root[data-layout="kuchnia"] .card h2{font-size:1.0625rem; font-weight:800; letter-spacing:-.01em;}
+:root[data-layout="kuchnia"] .hero{border-radius:30px; position:relative; overflow:hidden;}
+:root[data-layout="kuchnia"] .hero::before, :root[data-layout="kuchnia"] .hero::after{
+  content:""; position:absolute; border-radius:50%; pointer-events:none; background:var(--hero-field); opacity:.7;
+}
+:root[data-layout="kuchnia"] .hero::before{width:170px; height:170px; right:-40px; top:-60px;}
+:root[data-layout="kuchnia"] .hero::after{width:140px; height:140px; right:40px; bottom:-80px; opacity:.45;}
+:root[data-layout="kuchnia"] .hero > *{position:relative;}
+:root[data-layout="kuchnia"] .hero .eyebrow{text-transform:none; letter-spacing:0; font-size:0.875rem;}
+:root[data-layout="kuchnia"] .hero .amount{font-size:3.75rem;}
+:root[data-layout="kuchnia"] .hero .amount .zl{font-size:1.5rem; font-weight:700;}
+:root[data-layout="kuchnia"] .hero .hero-progress .track{height:10px; border-radius:5px; background:rgba(0,0,0,.14);}
+:root[data-layout="kuchnia"] .hero .hero-progress .bar{border-radius:5px; background:var(--hero-ink);}
+:root[data-layout="kuchnia"] .hero .caption{color:var(--hero-ink); opacity:.8;}
+:root[data-layout="kuchnia"] .hero .info-btn{border:none; background:rgba(255,255,255,.55); color:var(--hero-ink);}
+:root[data-layout="kuchnia"] button.btn-primary{background:var(--ink); color:var(--paper);}
+:root[data-layout="kuchnia"] button.btn-ghost{border:2px solid var(--line); background:var(--paper-raised);}
+:root[data-layout="kuchnia"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]), :root[data-layout="kuchnia"] textarea, :root[data-layout="kuchnia"] select{border:2px solid var(--line); background:var(--paper-raised); padding:12px 14px;}
+:root[data-layout="kuchnia"] .chip{border:none; background:var(--accent-soft); color:var(--ink); font-weight:700; padding:8px 14px;}
+:root[data-layout="kuchnia"] .chip.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+:root[data-layout="kuchnia"] .recipe-card{border:2px solid var(--line); border-radius:var(--radius); padding:14px;}
+:root[data-layout="kuchnia"] .recipe-card .head .name{font-size:1.125rem; font-weight:800; letter-spacing:-.01em;}
+:root[data-layout="kuchnia"] .ingredient-item{border:none; border-left:none; background:var(--paper); border-radius:18px; padding:10px 12px;}
+:root[data-layout="kuchnia"] .ingredient-item.matched{box-shadow:inset 0 0 0 2px var(--growth-soft);}
+:root[data-layout="kuchnia"] .ingredient-item.missing{border:2px dashed var(--line); background:transparent;}
+:root[data-layout="kuchnia"] .store-card, :root[data-layout="kuchnia"] .manage-product-row{border:2px solid var(--line); border-radius:var(--radius-sm);}
+:root[data-layout="kuchnia"] .info-btn{border:none; background:var(--accent-soft); color:var(--ink);}
+:root[data-layout="kuchnia"] nav.tabbar{
+  left:50%; bottom:calc(14px + env(safe-area-inset-bottom)); width:calc(100% - 28px); max-width:452px;
+  border:none; border-radius:35px; padding:10px 8px;
+}
+:root[data-layout="kuchnia"] .tab{color:var(--nav-ink);}
+:root[data-layout="kuchnia"] .tab .icon{width:48px; height:34px; border-radius:17px;}
+:root[data-layout="kuchnia"] .tab.active .icon{background:var(--nav-active-bg); color:var(--nav-active);}
+:root[data-layout="kuchnia"] .tab.active{color:#f6efe4;}
+:root[data-layout="kuchnia"] #moreTabMenu{bottom:calc(150px + env(safe-area-inset-bottom));}
+:root[data-layout="kuchnia"] #contactBubbleBtn{bottom:calc(100px + env(safe-area-inset-bottom)); background:var(--ink); color:var(--paper);}
+:root[data-layout="kuchnia"] #contactBubblePanel{bottom:calc(160px + env(safe-area-inset-bottom));}
+
 ::selection{background:var(--accent-soft);}
 @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important;} }
 </style>
 
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Karla:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Outfit:wght@400;500;600;700;800&display=swap">
 <!-- SheetJS — czyta plik .xlsx wybrany w "Zarządzaj listą", żeby appka mogła
      wczytać cotygodniową listę wprost z Excela (zakładki wg kategorii).
      Wersja z cdnjs (nie z cdn.sheetjs.com) — appka bywa hostowana jako
@@ -809,34 +901,57 @@ nav.tabbar{
 
 <div id="app">
   <div class="topbar">
-    <div class="brand"><svg class="coin-logo" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9.25" fill="var(--accent)"/><text x="10" y="14.3" text-anchor="middle" font-family="'Fraunces', serif" font-weight="700" font-size="11" fill="var(--accent-ink)">G</text></svg> Grosz do Grosza</div>
+    <div class="brand"><svg class="coin-logo" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9.25" fill="var(--accent)"/><text x="10" y="14.3" text-anchor="middle" font-family="var(--font-display)" font-weight="700" font-size="11" fill="var(--accent-ink)">G</text></svg> Grosz do Grosza</div>
     <div class="date" id="todayLabel"></div>
   </div>
 
-  <div class="privacy-strip">
-    <span id="privacyStripText">🔒 Twoje dane finansowe zostają tylko na tym urządzeniu.</span>
-    <button type="button" class="info-btn" id="privacyInfoBtn" aria-expanded="false" aria-controls="privacyInfoBox" aria-label="Więcej o prywatności">?</button>
-  </div>
-  <div class="info-box" id="privacyInfoBox" hidden>
-    <span id="privacyInfoText">Wszystko, co tu wpisujesz — dochód, wydatki, promocje, cele oszczędnościowe — zapisuje się wyłącznie lokalnie, w pamięci tej przeglądarki na tym urządzeniu (tzw. localStorage). Nie wysyłamy tych danych na żaden serwer i nikt — łącznie ze mną — nie ma do nich wglądu. Appka łączy się z internetem tylko w dwóch sytuacjach: gdy szukasz adresu (do darmowej usługi OpenStreetMap wysyłany jest wtedy sam wpisany adres, żeby znaleźć współrzędne) oraz przy wczytywaniu pliku Excel z produktami (pobierana jest jedynie biblioteka do odczytu pliku — jego zawartość zostaje na Twoim urządzeniu). Pamiętaj też: dane trzymane są tylko w tej przeglądarce — wyczyszczenie danych przeglądarki albo otwarcie appki na innym urządzeniu lub w innej przeglądarce oznacza start od zera.</span>
-  </div>
+  <!-- Notka o prywatności NIE wisi już nad każdą zakładką (zabierała
+       najcenniejsze miejsce na ekranie na każdym widoku) — mieszka w
+       zakładce Ustawienia (menu "Więcej"), razem z wyborem wyglądu. Same
+       identyfikatory (#privacyStripText/#privacyInfoBtn/#privacyInfoBox)
+       zostają, bo updatePrivacyCopy() nadal je uzupełnia. -->
+
+  <!-- ================= USTAWIENIA (menu "Więcej") ================= -->
+  <section class="panel" data-panel="ustawienia">
+    <div class="card">
+      <h2>Wygląd appki<span class="sub">Trzy layouty do wyboru — każdy ma własne kolory i krój pisma. Jasny/ciemny tryb appka dobiera sama wg ustawień telefonu.</span></h2>
+      <div id="paletteChooser" class="layout-row"></div>
+    </div>
+    <div class="card">
+      <h2>Wielkość tekstu</h2>
+      <div id="fontSizeChooser" class="fontsize-row"></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Prywatność</h2>
+        <button type="button" class="info-btn" id="privacyInfoBtn" aria-expanded="false" aria-controls="privacyInfoBox" aria-label="Więcej o prywatności">?</button>
+      </div>
+      <div class="privacy-strip"><span id="privacyStripText">Twoje dane finansowe zostają tylko na tym urządzeniu.</span></div>
+      <div class="info-box" id="privacyInfoBox" hidden>
+        <span id="privacyInfoText">Wszystko, co tu wpisujesz — dochód, wydatki, promocje, cele oszczędnościowe — zapisuje się wyłącznie lokalnie, w pamięci tej przeglądarki na tym urządzeniu (tzw. localStorage). Nie wysyłamy tych danych na żaden serwer i nikt — łącznie ze mną — nie ma do nich wglądu. Appka łączy się z internetem tylko w dwóch sytuacjach: gdy szukasz adresu (do darmowej usługi OpenStreetMap wysyłany jest wtedy sam wpisany adres, żeby znaleźć współrzędne) oraz przy wczytywaniu pliku Excel z produktami (pobierana jest jedynie biblioteka do odczytu pliku — jego zawartość zostaje na Twoim urządzeniu). Pamiętaj też: dane trzymane są tylko w tej przeglądarce — wyczyszczenie danych przeglądarki albo otwarcie appki na innym urządzeniu lub w innej przeglądarce oznacza start od zera.</span>
+      </div>
+    </div>
+  </section>
 
   <!-- ================= DZIŚ ================= -->
   <section class="panel" data-panel="dzis">
-    <!-- Przeniesione tu z zakładki Budżet na wyraźną prośbę Dawida: "Okno
-         wygląda appki przeniósłbym może do zakładki Dziś, na samą górę? Nad
-         okno DZIS MOZESZ WYDAC". -->
-    <div class="card">
-      <h2>Wygląd appki<span class="sub">Jasny/ciemny tryb appka dobiera sama wg ustawień telefonu — tu wybierasz tylko kolorystykę i wielkość tekstu</span></h2>
-      <div id="paletteChooser" class="palette-row"></div>
-      <div id="fontSizeChooser" class="fontsize-row"></div>
-    </div>
-
+    <!-- Kwota "Dziś możesz wydać" jest PIERWSZĄ rzeczą na ekranie (nowy
+         layout, zgłoszenie Dawida: appka była "kwadratowa", a najważniejsza
+         liczba chowała się pod kartą wyboru kolorystyki). Karta "Wygląd
+         appki" mieszka teraz w zakładce Ustawienia (menu "Więcej"). -->
     <div class="hero" id="heroCard">
-      <div class="eyebrow">Dziś możesz wydać</div>
+      <div class="hero-top">
+        <div class="eyebrow">Dziś możesz wydać</div>
+        <button type="button" class="info-btn" id="heroInfoBtn" aria-expanded="false" aria-controls="heroInfoBox" aria-label="Co się dzieje z niewydaną albo przekroczoną kwotą?">?</button>
+      </div>
       <div class="amount" id="heroAmount">— <span class="zl">zł</span></div>
+      <!-- Pasek postępu miesiąca (patrz renderHero) — wspólny element
+           wszystkich trzech layoutów, każdy rysuje go po swojemu w CSS. -->
+      <div class="hero-progress" id="heroProgress" hidden>
+        <div class="track"><div class="bar" id="heroProgressBar"></div></div>
+        <span class="lbl" id="heroProgressLabel"></span>
+      </div>
       <div class="caption" id="heroCaption">Uzupełnij budżet, żeby zobaczyć kwotę.</div>
-      <button type="button" class="info-btn" id="heroInfoBtn" aria-expanded="false" aria-controls="heroInfoBox" aria-label="Co się dzieje z niewydaną albo przekroczoną kwotą?" style="margin:10px auto 0;">?</button>
     </div>
     <div class="info-box" id="heroInfoBox" hidden style="margin:0 0 4px;">
       Drogi Użytkowniku! Pamiętaj, że jeśli dziś zmieścisz się w swoim budżecie — choćby o 1 grosz — ta zaoszczędzona kwota doliczy się do budżetu na jutro, więc jutro będziesz mieć do wydania trochę więcej. Jeśli natomiast dziś wydasz więcej, niż zakłada dzienny budżet, jutrzejsza kwota zostanie o tę nadwyżkę pomniejszona. Dzięki temu nic się nie gubi ani nie dokłada znikąd — liczy się to, ile wydajesz w całym miesiącu, a nie tylko jednego dnia.
@@ -1269,23 +1384,27 @@ nav.tabbar{
     </div>
   </section>
 
+  <!-- Pasek zakładek (nowy layout): 4 główne + "Więcej". Cele i Sklepy
+       przeszły do menu "Więcej" razem z Ustawieniami i FAQ — 7 pozycji w
+       pasku było za ciasno na telefonie, a ikony-emoji wyglądały na każdym
+       systemie inaczej; teraz to rysowane ikony (SVG), które przyjmują kolor
+       layoutu. Głównymi zakładkami zostały te, do których wchodzi się co
+       dzień: Dziś, Promocje, Przepisy, Budżet. -->
   <nav class="tabbar">
-    <button class="tab" data-tab="dzis"><span class="icon">🏠</span>Dziś</button>
-    <button class="tab" data-tab="budzet"><span class="icon">💳</span>Budżet</button>
-    <button class="tab" data-tab="oszczednosci"><span class="icon">🏆</span>Cele</button>
-    <button class="tab" data-tab="sklepy"><span class="icon">📍</span>Sklepy</button>
-    <button class="tab" data-tab="promocje"><span class="icon">🛒</span>Promocje</button>
-    <button class="tab" data-tab="przepisy"><span class="icon">🍳</span>Przepisy</button>
+    <button class="tab" data-tab="dzis"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Dziś</button>
+    <button class="tab" data-tab="promocje"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4L13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>Promocje</button>
+    <button class="tab" data-tab="przepisy"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M6 19V9a6 6 0 0 1 12 0v10"/><path d="M12 3v2"/></svg></span>Przepisy</button>
+    <button class="tab" data-tab="budzet"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>Budżet</button>
     <!-- "Więcej" NIE jest zwykłą zakładką (brak data-tab, więc omija ogólne
          .tab[data-tab] click-binding w bindEvents) — otwiera osobne, małe
-         rozwijane menu (#moreTabMenu) nad paskiem, tak żeby stałych, zawsze
-         widocznych zakładek zostało 6 (zgłoszenie Dawida: FAQ "poniżej tych
-         pięciu/sześciu", w rozwijanym menu, zamiast dokładania 7. zakładki na
-         stałe). Miejsce na przyszłe kolejne pozycje w tym menu, nie tylko FAQ. -->
-    <button type="button" class="tab" id="moreTabBtn" aria-haspopup="true" aria-expanded="false" aria-controls="moreTabMenu"><span class="icon">⋯</span>Więcej</button>
+         rozwijane menu (#moreTabMenu) nad paskiem. -->
+    <button type="button" class="tab" id="moreTabBtn" aria-haspopup="true" aria-expanded="false" aria-controls="moreTabMenu"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span>Więcej</button>
   </nav>
   <div id="moreTabMenu" hidden>
-    <button type="button" class="more-tab-item" data-tab="faq"><span class="icon">❓</span>FAQ — pytania i odpowiedzi</button>
+    <button type="button" class="more-tab-item" data-tab="oszczednosci"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4"/><path d="M17 6h3a3 3 0 0 1-3 4"/></svg></span>Cele i oszczędności</button>
+    <button type="button" class="more-tab-item" data-tab="sklepy"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>Sklepy w okolicy</button>
+    <button type="button" class="more-tab-item" data-tab="ustawienia"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>Ustawienia i wygląd</button>
+    <button type="button" class="more-tab-item" data-tab="faq"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><circle cx="12" cy="17" r=".6"/></svg></span>FAQ — pytania i odpowiedzi</button>
   </div>
 
   <button type="button" id="contactBubbleBtn" aria-expanded="false" aria-controls="contactBubblePanel" title="Masz pytania, sugestie, wątpliwości? Napisz do nas.">💬</button>
@@ -1378,7 +1497,7 @@ const DEFAULT_STATE = {
                      // NIE na dobór produktów w "Co dziś kupisz", to wciąż liczy się po cenie jednostkowej)
   profile: { city: '' }, // Twoja lokalizacja (miasto) — filtruje zgłoszenia cen: appka pokazuje tylko zgłoszenia z pasującej lokalizacji (+ te bez podanej lokalizacji)
   deviceId: null, // losowy, anonimowy identyfikator TEGO urządzenia/przeglądarki — używany tylko po to, żeby Supabase wiedziało, że to Twój głos/zgłoszenie (żadnych kont, żadnych danych osobowych)
-  settings: { colorPalette: 'navy', fontSize: 'small', calendarViewMode: 'month' }, // colorPalette: 'navy'|'mint'|'plum' — patrz applyColorPalette/renderPaletteChooser; fontSize: 'small'|'medium'|'large' — patrz applyFontSize/renderFontSizeChooser (karta "Wygląd appki" na górze zakładki Dziś); calendarViewMode: 'month'|'week' — wybór widoku kalendarza wydatków (patrz renderSpendCalendar) — zgłoszenie Dawida: appka "zapominała" wybór po odświeżeniu, skoro trzymała go w zwykłej zmiennej zamiast w state;
+  settings: { layout: 'kokpit', fontSize: 'small', calendarViewMode: 'month' }, // layout: 'kokpit'|'gazetka'|'kuchnia' — patrz LAYOUTS/applyLayout/renderPaletteChooser (dawniej colorPalette: navy/mint/plum); fontSize: 'small'|'medium'|'large' — patrz applyFontSize/renderFontSizeChooser (karta "Wygląd appki" na górze zakładki Dziś); calendarViewMode: 'month'|'week' — wybór widoku kalendarza wydatków (patrz renderSpendCalendar) — zgłoszenie Dawida: appka "zapominała" wybór po odświeżeniu, skoro trzymała go w zwykłej zmiennej zamiast w state;
                                        // jasny/ciemny appka i tak dobiera sama wg telefonu, wybór dotyczy tylko tego, KTÓRA z trzech palet
   achievements: { actions: { fixedCosts: false, buffer: false } },
   // actions: odznaki za JEDNORAZOWĄ czynność (dodanie kosztów stałych / bufora) — raz ustawione na true
@@ -1460,36 +1579,55 @@ const PROMO_DISCLAIMER_TEXT =
   'Większość sklepów, tworząc promocje, posługuje się widełkami czasowymi „od–do”, a często dodatkowo zaznacza „lub do wyczerpania zapasów” — oznacza to, ' +
   'że produkt objęty jest promocją np. do 4 września, ale 2 września mógł już zostać całkowicie wykupiony.';
 
-/* Trzy kolorystyki appki (patrz TOKENS w <style> — data-palette na <html>).
-   Kolory tu w JS to tylko próbki jasnego wariantu, do narysowania kółek w
-   #paletteChooser — reszta (w tym ciemny tryb) jest wyłącznie w CSS,
-   appka nie musi jej znać, żeby ją zastosować (wystarczy atrybut). */
-const COLOR_PALETTES = [
-  { id: 'navy', name: 'Głęboki granat i złoto', swatches: ['#eef1f6', '#c8942f', '#1f7a5c'] },
-  { id: 'mint', name: 'Mięta i koral', swatches: ['#f1f8f5', '#ef7860', '#189e77'] },
-  { id: 'plum', name: 'Śliwka i miedź', swatches: ['#f5eef2', '#c46a2e', '#4c7a3f'] }
+/* Trzy LAYOUTY appki (patrz TOKENS w <style> — data-layout na <html>).
+   Zastąpiły dawne trzy palety kolorów (navy/mint/plum): Dawid obejrzał trzy
+   zaproponowane kierunki nowego wyglądu ("Gazetka", "Kokpit", "Ciepła
+   kuchnia"), spodobały mu się wszystkie i poprosił, żeby to UŻYTKOWNIK
+   wybierał jeden z nich. Każdy layout to komplet: własna paleta (jasna i
+   ciemna), krój pisma, styl kart, pasek nawigacji i "hero" z kwotą — a nie
+   tylko kolory. Kolory tu w JS to jedynie próbki do narysowania kółek w
+   #paletteChooser (id zostaje, żeby nie ruszać reszty kodu) — cała reszta
+   jest wyłącznie w CSS, appka nie musi jej znać, żeby ją nałożyć
+   (wystarczy atrybut). Domyślny "kokpit" — najbliższy dawnej kolorystyce
+   appki i najbardziej "aplikacyjny" (wybór Dawida). */
+const LAYOUTS = [
+  { id: 'kokpit', name: 'Kokpit', desc: 'Granat i złoto, ciemny nagłówek z kwotą, płaskie listy', swatches: ['#10203a', '#c8942f', '#eef1f6'], themeColor: '#10203a' },
+  { id: 'gazetka', name: 'Gazetka', desc: 'Ciepły papier, szeryfowe liczby, linie zamiast ramek', swatches: ['#f7f3ea', '#9a6f1c', '#15223a'], themeColor: '#f7f3ea' },
+  { id: 'kuchnia', name: 'Ciepła kuchnia', desc: 'Zaokrąglone, pastelowe kafelki i pływający pasek', swatches: ['#fbf6ee', '#f3c85a', '#2b2419'], themeColor: '#f3c85a' }
 ];
+const DEFAULT_LAYOUT = 'kokpit';
+const COLOR_PALETTES = LAYOUTS; // dawna nazwa — zostawiona dla czytelności starszych komentarzy/testów
 
-/* Nakłada wybraną kolorystykę jako atrybut data-palette na <html> — CSS (patrz
+/* Migracja starych ustawień: ktoś, kto miał wybraną jedną z dawnych palet
+   (navy/mint/plum) albo w ogóle nic, dostaje domyślny layout. */
+function currentLayoutId(){
+  const raw = state.settings && state.settings.layout;
+  return LAYOUTS.some(l => l.id === raw) ? raw : DEFAULT_LAYOUT;
+}
+
+/* Nakłada wybrany layout jako atrybut data-layout na <html> — CSS (patrz
    TOKENS) robi resztę, w tym automatyczny dobór jasny/ciemny wg telefonu.
    Aktualizujemy też <meta name="theme-color">, żeby pasek przeglądarki na
-   telefonie (Android/Chrome) miał kolor zgodny z akcentem appki, nie
-   zostawał na sztywno w kolorze z pierwszej wersji appki. */
+   telefonie (Android/Chrome) miał kolor zgodny z nagłówkiem appki. */
 function applyColorPalette(){
-  const id = COLOR_PALETTES.some(p => p.id === state.settings.colorPalette) ? state.settings.colorPalette : 'navy';
-  document.documentElement.setAttribute('data-palette', id);
+  const id = currentLayoutId();
+  document.documentElement.setAttribute('data-layout', id);
+  document.documentElement.removeAttribute('data-palette');
   const meta = document.querySelector('meta[name="theme-color"]');
-  const palette = COLOR_PALETTES.find(p => p.id === id);
-  if (meta && palette) meta.setAttribute('content', palette.swatches[1]);
+  const layout = LAYOUTS.find(l => l.id === id);
+  if (meta && layout) meta.setAttribute('content', layout.themeColor);
 }
+const applyLayout = applyColorPalette;
 
 function renderPaletteChooser(){
   const el = document.getElementById('paletteChooser');
   if (!el) return;
-  el.innerHTML = COLOR_PALETTES.map(p =>
-    '<button type="button" class="palette-option' + (state.settings.colorPalette === p.id ? ' active' : '') + '" data-palette-choice="' + p.id + '">' +
-      '<span class="swatches">' + p.swatches.map(c => '<span style="background:' + c + '"></span>').join('') + '</span>' +
-      escapeHtml(p.name) +
+  const current = currentLayoutId();
+  el.innerHTML = LAYOUTS.map(l =>
+    '<button type="button" class="layout-option' + (current === l.id ? ' active' : '') + '" data-layout-choice="' + l.id + '" data-palette-choice="' + l.id + '">' +
+      '<span class="swatches">' + l.swatches.map(c => '<span style="background:' + c + '"></span>').join('') + '</span>' +
+      '<span class="layout-name">' + escapeHtml(l.name) + '</span>' +
+      '<span class="layout-desc">' + escapeHtml(l.desc) + '</span>' +
     '</button>'
   ).join('');
 }
@@ -2063,7 +2201,7 @@ function loadInitialState(){
   // najprostszy, uniwersalny sygnał "to urządzenie już z appki korzystało" —
   // reszta warunków zostaje jako dodatkowe zabezpieczenie.
   const hasContent = s => !!(s && (s.deviceId || s.home || (s.profile && s.profile.city)
-    || (s.settings && s.settings.colorPalette) || (s.shoppingList||[]).length
+    || (s.settings && (s.settings.colorPalette || s.settings.layout)) || (s.shoppingList||[]).length
     || (s.budget && (s.budget.income>0 || (s.budget.fixedCosts||[]).length)
     || (s.products||[]).length || (s.stores||[]).length
     || (s.savings && ((s.savings.log||[]).length || (s.savings.extraFromBuffer||[]).length))
@@ -2177,7 +2315,8 @@ applyFontSize();
    viewer's personal theme/kolorystyka choice for everyone else. */
 const INITIAL_SHELL = ('<!doctype html>\n' + document.documentElement.outerHTML)
   .replace(/\sdata-theme="[^"]*"/g, '')
-  .replace(/\sdata-palette="[^"]*"/g, ' data-palette="navy"');
+  .replace(/\sdata-palette="[^"]*"/g, '')
+  .replace(/\sdata-layout="[^"]*"/g, ' data-layout="kokpit"');
 const STATE_SCRIPT_RE = /<script id="state-data"[^>]*>[\s\S]*?<\/script>/;
 
 /* Sprawdza — zanim użytkownik cokolwiek zrobi — czy appka jest otwarta jako
@@ -2205,10 +2344,10 @@ function updatePrivacyCopy(){
   const infoEl = document.getElementById('privacyInfoText');
   if (!stripEl || !infoEl) return;
   if (artifactAPI){
-    stripEl.textContent = '🔒 Twoje dane widzisz tylko Ty — appka zapisuje je na tej prywatnej stronie.';
+    stripEl.textContent = 'Twoje dane widzisz tylko Ty — appka zapisuje je na tej prywatnej stronie.';
     infoEl.textContent = 'Wszystko, co tu wpisujesz — dochód, wydatki, promocje, cele oszczędnościowe — zapisuje się na tej stronie, którą (dopóki sam/a jej nie udostępnisz komuś innemu) widzisz tylko Ty. W odróżnieniu od wersji zapisanej lokalnie w przeglądarce, appka i te same dane są tu dostępne z każdego urządzenia, na którym otworzysz ten sam link — telefonu, komputera, gdziekolwiek. Appka łączy się z internetem też przy wczytywaniu pliku Excel z produktami (pobierana jest jedynie biblioteka do odczytu pliku — jego zawartość zostaje na tej stronie). Wyszukiwanie adresu sklepu po nazwie może w tej wersji nie zadziałać, bo środowisko, w którym appka jest tu hostowana, blokuje część połączeń z internetem — w takim wypadku po prostu wklej współrzędne ręcznie, appka je przyjmie tak samo.' + PRICE_REPORT_PRIVACY_NOTE;
   } else {
-    stripEl.textContent = '🔒 Twoje dane finansowe zostają tylko na tym urządzeniu.';
+    stripEl.textContent = 'Twoje dane finansowe zostają tylko na tym urządzeniu.';
     infoEl.textContent = 'Wszystko, co tu wpisujesz — dochód, wydatki, promocje, cele oszczędnościowe — zapisuje się wyłącznie lokalnie, w pamięci tej przeglądarki na tym urządzeniu (tzw. localStorage). Nie wysyłamy tych danych na żaden serwer i nikt — łącznie ze mną — nie ma do nich wglądu. Appka łączy się z internetem tylko w dwóch sytuacjach: gdy szukasz adresu (do darmowej usługi OpenStreetMap wysyłany jest wtedy sam wpisany adres, żeby znaleźć współrzędne) oraz przy wczytywaniu pliku Excel z produktami (pobierana jest jedynie biblioteka do odczytu pliku — jego zawartość zostaje na Twoim urządzeniu). Pamiętaj też: dane trzymane są tylko w tej przeglądarce — wyczyszczenie danych przeglądarki albo otwarcie appki na innym urządzeniu lub w innej przeglądarce oznacza start od zera.' + PRICE_REPORT_PRIVACY_NOTE;
   }
 }
@@ -4009,13 +4148,26 @@ function renderHero(){
   const amountEl = document.getElementById('heroAmount');
   const captionEl = document.getElementById('heroCaption');
   const b = state.budget;
+  const progressEl = document.getElementById('heroProgress');
   if (!b.income){
     hero.classList.remove('warn');
     amountEl.innerHTML = '— <span class="zl">zł</span>';
     captionEl.textContent = 'Uzupełnij dochód i koszty stałe w zakładce Budżet.';
+    if (progressEl) progressEl.hidden = true;
     return;
   }
   const calc = computeBudget();
+  // Pasek postępu miesiąca (nowy layout): ile dni miesiąca już za nami.
+  // Czysto orientacyjny — sama kwota nadal liczy się jak dotąd.
+  if (progressEl){
+    const now = new Date();
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const pct = Math.max(0, Math.min(100, Math.round(dayOfMonth / daysInMonth * 100)));
+    document.getElementById('heroProgressBar').style.width = pct + '%';
+    document.getElementById('heroProgressLabel').textContent = 'dzień ' + dayOfMonth + ' z ' + daysInMonth;
+    progressEl.hidden = false;
+  }
   const adjustment = cumulativeAdjustmentBefore(todayDateKey());
   const allotted = calc.daily + adjustment; // ile budżetu przydzielono na dziś (po korekcie z poprzednich dni)
   const spentToday = dailySpendTotalForDate(todayDateKey());
@@ -4989,7 +5141,7 @@ function renderBudgetBasketByStore(){
    EVENTS
    ==================================================================== */
 
-const MAIN_TABS = ['dzis', 'budzet', 'oszczednosci', 'sklepy', 'promocje', 'przepisy'];
+const MAIN_TABS = ['dzis', 'promocje', 'przepisy', 'budzet']; // reszta (Cele, Sklepy, Ustawienia, FAQ) siedzi w menu "Więcej"
 
 function switchTab(name){
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === name));
@@ -5192,11 +5344,12 @@ function bindEvents(){
     const id = e.target.closest('[data-palette-choice]');
     if (!id) return;
     const chosen = id.getAttribute('data-palette-choice');
-    if (chosen === state.settings.colorPalette) return;
-    state.settings.colorPalette = chosen;
+    if (chosen === currentLayoutId()) return;
+    state.settings.layout = chosen;
+    delete state.settings.colorPalette;
     applyColorPalette();
     renderPaletteChooser();
-    await persist('Zmieniono kolorystykę appki.');
+    await persist('Zmieniono wygląd appki.');
   });
 
   document.getElementById('fontSizeChooser').addEventListener('click', async (e) => {
