@@ -633,6 +633,17 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
   background:var(--paper); color:var(--ink-soft); cursor:pointer;
 }
 .list-toggle-btn.active{background:var(--growth-soft); border-color:var(--growth); color:var(--growth);}
+/* "✕ nie pasuje" przy dopasowanym produkcie w przepisie — patrz
+   toggleRecipeExclusion/state.recipeExclusions. Ten sam rząd co "+ Dodaj do
+   listy", żeby obie akcje przy produkcie były razem, blisko siebie. */
+.excl-btn{
+  font-family:'Karla', sans-serif; font-size:0.71875rem; font-weight:600;
+  padding:5px 10px; border-radius:999px; border:1px solid var(--line);
+  background:var(--paper); color:var(--warn); cursor:pointer; margin-top:4px;
+}
+.excl-note{flex-basis:100%; font-size:0.71875rem; color:var(--ink-faint); margin-top:4px; line-height:1.6;}
+.excl-chip{display:inline-flex; align-items:center; gap:4px; background:var(--paper); border:1px solid var(--line); border-radius:999px; padding:2px 4px 2px 8px; margin:0 4px 4px 0;}
+.excl-chip button{border:none; background:none; color:var(--growth); cursor:pointer; font-size:0.8125rem; padding:2px 4px;}
 .vote-btn{
   font-family:'Karla', sans-serif; font-size:0.71875rem; padding:3px 8px;
   border-radius:999px; border:1px solid var(--line); background:var(--paper);
@@ -1345,6 +1356,16 @@ const DEFAULT_STATE = {
                // otwarciu (fetchRecipesFeed) i CAŁKOWICIE zastępowane przy kolejnym pobraniu (w
                // przeciwieństwie do state.products/state.stores nie ma tu żadnego innego źródła do
                // zachowania — to jedyna lista przepisów, użytkownik sam nic tu nie dopisuje).
+  recipeExclusions: {}, // { [recipeId]: { [znormalizowana nazwa składnika]: [znormalizowana nazwa PRODUKTU, ...] } }
+                        // Zgłoszenie Dawida (po flagach na produktach, patrz excludeFromRecipes: "łosoś
+                        // atlantycki wędzony na gorąco" pasuje do "łosoś" w Łosoś pieczony z warzywami, ale
+                        // to nie jest kwestia "surowy/nie surowy" — po prostu TEN produkt nie nadaje się do
+                        // TEGO KONKRETNEGO przepisu; w innym przepisie mógłby jak najbardziej pasować). Appka
+                        // pokazuje przy dopasowanym produkcie przycisk "✕ nie pasuje" (patrz renderRecipesPanel/
+                        // toggleRecipeExclusion) — klik dopisuje nazwę produktu tutaj, WYŁĄCZNIE dla tego
+                        // składnika w tym przepisie, i appka nigdy więcej go tam nie zaproponuje (ale nadal
+                        // może pasować gdzie indziej). Klucz to znormalizowana NAZWA (normalizePL), nie id —
+                        // id produktów zmienia się przy każdym pobraniu z sieci (patrz fetchRemoteFeed).
   lastImport: null,
   shoppingList: [], // [{id, qty}, ...] — produkty ręcznie wybrane z "Co dziś kupisz"/"Wszystkie promocje" do własnej listy zakupów,
                      // qty: ile sztuk chce kupić (edytowalne tylko w "Twoja lista zakupów" — wpływa na sumę tam pokazaną,
@@ -2722,14 +2743,40 @@ function ingredientMatchesProduct(ingredientName, productName){
    trafi do dopasowań ŻADNEGO składnika w ŻADNYM przepisie, teraz ani w
    przyszłości. Flaga jest trwała: fetchRemoteFeed() przenosi ją na świeżo
    pobrany odpowiednik tego samego produktu (dopasowanie po nazwie+sklepie),
-   więc kolejne cotygodniowe pobranie promocji jej nie kasuje. */
-function matchIngredientToActiveProducts(ingredient, activeProducts){
+   więc kolejne cotygodniowe pobranie promocji jej nie kasuje.
+
+   NASTĘPNY ZGŁOSZONY PRZYPADEK (Dawid): nawet flaga na produkcie bywa za
+   "sztywna" — "Łosoś atlantycki wędzony na gorąco" to jak najbardziej łosoś,
+   tylko jako gotowy produkt na kanapkę, więc dla przepisu "Łosoś pieczony z
+   warzywami" to zła propozycja — ale w INNYM przepisie (np. na kanapki z
+   wędzonym łososiem) byłby jak najbardziej trafny. To nie cecha PRODUKTU
+   (jak excludeFromRecipes), tylko konkretnej PARY przepis+składnik.
+   Naprawka #3: przycisk "✕ nie pasuje" przy dopasowanym produkcie w karcie
+   przepisu (patrz renderRecipesPanel) zapisuje wykluczenie w
+   state.recipeExclusions[recipeId][znormalizowany składnik] — wyłącznie dla
+   TEGO przepisu, ten sam produkt nadal może dopasować się gdzie indziej. */
+// Zwraca ORYGINALNE (nie znormalizowane) nazwy wykluczonych produktów — do
+// wyświetlenia w notce "Wykluczone dla tego przepisu" (patrz
+// renderRecipesPanel). Porównania (dopasowanie/usuwanie) i tak zawsze idą
+// przez normalizePL, więc drobne różnice wielkości liter/pisowni między
+// kolejnymi pobraniami promocji nie psują wykluczenia.
+function excludedProductNamesFor(recipeId, ingredientName){
+  const forRecipe = (state.recipeExclusions && state.recipeExclusions[recipeId]) || {};
+  const list = forRecipe[normalizePL(ingredientName)];
+  return Array.isArray(list) ? list : [];
+}
+function isProductExcludedForIngredient(recipeId, ingredientName, productName){
+  const target = normalizePL(productName);
+  return excludedProductNamesFor(recipeId, ingredientName).some(n => normalizePL(n) === target);
+}
+function matchIngredientToActiveProducts(ingredient, activeProducts, recipeId){
   const ingredientName = (ingredient && ingredient.name) || '';
   const ingredientCategory = (ingredient && ingredient.category) || '';
   const matches = activeProducts.filter(p =>
     !p.excludeFromRecipes &&
     (!ingredientCategory || p.category === ingredientCategory) &&
-    ingredientMatchesProduct(ingredientName, p.name)
+    ingredientMatchesProduct(ingredientName, p.name) &&
+    !(recipeId && isProductExcludedForIngredient(recipeId, ingredientName, p.name))
   );
   matches.sort((a, b) => {
     const da = storeDistanceKm(a.store), db = storeDistanceKm(b.store);
@@ -2757,8 +2804,38 @@ function ingredientChoiceKey(p){
    ZWINIĘTYCH kart, których nikt jeszcze nie otworzył. */
 function recipeMatchStats(recipe, activeProducts){
   const total = recipe.ingredients.length;
-  const matchedCount = recipe.ingredients.filter(ing => matchIngredientToActiveProducts(ing, activeProducts).length > 0).length;
+  const matchedCount = recipe.ingredients.filter(ing => matchIngredientToActiveProducts(ing, activeProducts, recipe.id).length > 0).length;
   return { matchedCount, total, ratio: total ? matchedCount / total : 0 };
+}
+
+/* Dodaje/usuwa wykluczenie produktu dla KONKRETNEGO składnika w KONKRETNYM
+   przepisie (patrz state.recipeExclusions i komentarz przy
+   matchIngredientToActiveProducts) — czysta funkcja na obiekcie state, wołający
+   sam robi renderAll()+persist(). Zapisujemy ORYGINALNĄ nazwę produktu (nie
+   znormalizowaną) — dzięki temu notka "Wykluczone dla tego przepisu" może ją
+   pokazać z prawdziwymi polskimi znakami/wielkością liter; porównania przy
+   dodawaniu/usuwaniu/dopasowywaniu i tak zawsze idą przez normalizePL. */
+function toggleRecipeExclusion(recipeId, ingredientName, productName){
+  const key = normalizePL(ingredientName);
+  const productKey = normalizePL(productName);
+  if (!state.recipeExclusions) state.recipeExclusions = {};
+  if (!state.recipeExclusions[recipeId]) state.recipeExclusions[recipeId] = {};
+  const forIngredient = Array.isArray(state.recipeExclusions[recipeId][key]) ? state.recipeExclusions[recipeId][key] : [];
+  const idx = forIngredient.findIndex(n => normalizePL(n) === productKey);
+  let excluded;
+  if (idx === -1){
+    state.recipeExclusions[recipeId][key] = [...forIngredient, productName];
+    excluded = true;
+  } else {
+    const updated = forIngredient.filter((n, i) => i !== idx);
+    if (updated.length) state.recipeExclusions[recipeId][key] = updated;
+    else delete state.recipeExclusions[recipeId][key];
+    excluded = false;
+  }
+  // Sprzątanie: jeśli to był ostatni wykluczony składnik w tym przepisie,
+  // nie zostawiamy po sobie pustego {} pod recipeId w state.
+  if (!Object.keys(state.recipeExclusions[recipeId]).length) delete state.recipeExclusions[recipeId];
+  return excluded;
 }
 
 /* Bazowa liczba porcji przepisu — wyciągnięta z wolnotekstowego pola
@@ -3601,7 +3678,7 @@ function renderRecipesPanel(){
   el.innerHTML = shown.map(({ r, stats }) => {
     const choices = recipeIngredientChoice[r.id] || {};
     const matches = r.ingredients.map((ing, idx) => {
-      const candidates = matchIngredientToActiveProducts(ing, activeProducts);
+      const candidates = matchIngredientToActiveProducts(ing, activeProducts, r.id);
       const chosenKey = choices[idx];
       const chosen = chosenKey ? candidates.find(p => ingredientChoiceKey(p) === chosenKey) : null;
       return { ing, idx, product: chosen || candidates[0] || null, candidates };
@@ -3636,6 +3713,21 @@ function renderRecipesPanel(){
         const scaledAmount = scaleAmountText(ing.amount, servingsFactor);
         const amountHtml = scaledAmount ? '<span class="ing-amount">' + escapeHtml(scaledAmount) + '</span>' : '';
         const head = '<div class="ing-head"><span class="ing-num">' + (idx + 1) + '</span><span class="ing-name">' + escapeHtml(ing.name) + '</span>' + amountHtml + '</div>';
+        // Zgłoszenie Dawida: nawet trafny (kategoria + nazwa) produkt bywa
+        // złym pomysłem dla KONKRETNEGO przepisu (np. "Łosoś atlantycki
+        // wędzony na gorąco" pasuje do "łosoś", ale to gotowy produkt na
+        // kanapkę, nie surowiec do pieczenia) — bez bycia złym pomysłem w
+        // ogóle (w innym przepisie mógłby jak najbardziej pasować), więc
+        // globalna flaga na produkcie (excludeFromRecipes) tu nie pasuje.
+        // "✕ nie pasuje" wyklucza go WYŁĄCZNIE dla tego składnika w tym
+        // przepisie (patrz toggleRecipeExclusion/state.recipeExclusions), a
+        // notka niżej pozwala to cofnąć bez grzebania w panelu admina.
+        const excludedNames = excludedProductNamesFor(r.id, ing.name);
+        const excludedNoteHtml = excludedNames.length
+          ? '<div class="excl-note">Wykluczone dla tego przepisu: ' +
+            excludedNames.map(n => '<span class="excl-chip">' + escapeHtml(n) + ' <button type="button" data-excl-undo-recipe="' + escapeHtml(r.id) + '" data-excl-undo-ing="' + escapeHtml(ing.name) + '" data-excl-undo-product="' + escapeHtml(n) + '" title="Przywróć to dopasowanie">↩</button></span>').join(' ') +
+            '</div>'
+          : '';
         if (p){
           // Kilka pasujących produktów naraz (np. kilka różnych szynek w
           // promocji) — zgłoszenie Dawida: zamiast po cichu chować resztę,
@@ -3649,11 +3741,12 @@ function renderRecipesPanel(){
                 escapeHtml(c.name) + ' (' + escapeHtml(c.store) + ') · ' + formatPLN(c.price) + '</option>').join('') +
               '</select></div>'
             : '';
+          const exclBtnHtml = '<button type="button" class="excl-btn" data-excl-recipe="' + escapeHtml(r.id) + '" data-excl-ing="' + escapeHtml(ing.name) + '" data-excl-product="' + escapeHtml(p.name) + '" title="Ten konkretny produkt nie pasuje do tego przepisu">✕ nie pasuje</button>';
           const productBlock = '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + '</span>' +
-            pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + '</div>';
-          return '<div class="ingredient-item matched">' + head + productBlock + '</div>';
+            pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + exclBtnHtml + '</div>';
+          return '<div class="ingredient-item matched">' + head + productBlock + excludedNoteHtml + '</div>';
         }
-        return '<div class="ingredient-item missing">' + head + '<div class="missing-ingredient"><span class="buy-tag">🛒 do dokupienia</span></div></div>';
+        return '<div class="ingredient-item missing">' + head + '<div class="missing-ingredient"><span class="buy-tag">🛒 do dokupienia</span></div>' + excludedNoteHtml + '</div>';
       }).join('');
       const servingsPickerHtml = '<span class="servings-picker">' + [2, 4, 6].map(n =>
         '<button type="button" class="' + (n === selectedServings ? 'active' : '') + '" data-servings-pick="' + escapeHtml(r.id) + '" data-servings-value="' + n + '">' + n + '</button>'
@@ -5691,7 +5784,7 @@ function bindEvents(){
   bindPriceReportDelegation(document.getElementById('productsByStore'));
   bindPriceReportDelegation(document.getElementById('recipesList')); // pozwala użyć "+ Dodaj do listy" przy dopasowanych składnikach
 
-  document.getElementById('recipesList').addEventListener('click', (e) => {
+  document.getElementById('recipesList').addEventListener('click', async (e) => {
     if (e.target.getAttribute('data-loadmore-recipes') !== null){
       recipesVisibleCount += LIST_PAGE_STEP;
       renderRecipesPanel();
@@ -5707,6 +5800,30 @@ function bindEvents(){
       const value = parseInt(servingsBtn.getAttribute('data-servings-value'), 10);
       if (recipeId && value) recipeServingsChoice[recipeId] = value;
       renderRecipesPanel();
+      return;
+    }
+    // "✕ nie pasuje" przy dopasowanym produkcie — wyklucza go WYŁĄCZNIE dla
+    // tego składnika w tym przepisie (patrz toggleRecipeExclusion). Też
+    // sprawdzane PRZED [data-recipe-toggle], z tego samego powodu co wyżej.
+    const exclBtn = e.target.closest('[data-excl-recipe]');
+    if (exclBtn){
+      const recipeId = exclBtn.getAttribute('data-excl-recipe');
+      const ingName = exclBtn.getAttribute('data-excl-ing');
+      const productName = exclBtn.getAttribute('data-excl-product');
+      toggleRecipeExclusion(recipeId, ingName, productName);
+      renderAll();
+      await persist('Wykluczono „' + productName + '” z dopasowań dla „' + ingName + '” w tym przepisie.');
+      return;
+    }
+    // "↩ przywróć" przy wcześniej wykluczonym produkcie (notka pod składnikiem).
+    const undoBtn = e.target.closest('[data-excl-undo-recipe]');
+    if (undoBtn){
+      const recipeId = undoBtn.getAttribute('data-excl-undo-recipe');
+      const ingName = undoBtn.getAttribute('data-excl-undo-ing');
+      const productName = undoBtn.getAttribute('data-excl-undo-product');
+      toggleRecipeExclusion(recipeId, ingName, productName);
+      renderAll();
+      await persist('Przywrócono „' + productName + '” do dopasowań dla „' + ingName + '”.');
       return;
     }
     // Rozwijanie/zwijanie karty przepisu — ale nie wtedy, gdy kliknięcie
