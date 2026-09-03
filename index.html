@@ -1762,14 +1762,37 @@ let capabilityAttempted = false;
 
 /* ---------------- helpers ---------------- */
 
+/* ZNALEZIONY BŁĄD (przy przeglądzie kodu, nie zgłoszony przez Dawida —
+   wyszedł dopiero przy teście, który faktycznie PRZEŁADOWUJE stronę po
+   ustawieniu wykluczenia, czego żaden wcześniejszy test nie robił): ta
+   funkcja przechodziła TYLKO po kluczach obiektu `base` (czyli DEFAULT_STATE)
+   — dla pól o STAŁYM kształcie (np. `settings: {colorPalette, fontSize,
+   ...}`) to nie problem, bo te klucze zawsze tam są. Ale `recipeExclusions`
+   to słownik z kluczami, których DEFAULT_STATE nie może z góry znać (id
+   przepisu) — zaczyna się jako `{}`, więc pętla `for (const k of
+   Object.keys(base))` miała ZERO kluczy do przejścia, i CAŁA zawartość
+   `incoming.recipeExclusions` była po cichu gubiona przy KAŻDYM przeładowaniu
+   strony/otwarciu appki (deepMerge(DEFAULT_STATE, fromLocal) na starcie) —
+   czyli każde kliknięcie "✕ nie pasuje" znikało zaraz po zamknięciu appki.
+   Naprawka: przechodzimy po SUMIE kluczy `base` i `incoming`, nie tylko
+   `base` — dla pól o stałym kształcie zachowuje się dokładnie tak samo jak
+   dotychczas (te klucze i tak już tam są), a dla słowników z dynamicznymi
+   kluczami (jak recipeExclusions) poprawnie zachowuje wszystko, co faktycznie
+   zapisano. */
 function deepMerge(base, incoming){
   if (!incoming || typeof incoming !== 'object') return structuredCloneSafe(base);
   const out = structuredCloneSafe(base);
-  for (const k of Object.keys(base)){
+  const keys = new Set([...Object.keys(base), ...Object.keys(incoming)]);
+  for (const k of keys){
     if (incoming[k] === undefined) continue;
-    if (Array.isArray(base[k])) out[k] = Array.isArray(incoming[k]) ? incoming[k] : base[k];
-    else if (base[k] && typeof base[k] === 'object') out[k] = deepMerge(base[k], incoming[k]);
-    else out[k] = incoming[k];
+    if (Array.isArray(base[k]) || Array.isArray(incoming[k])){
+      out[k] = Array.isArray(incoming[k]) ? incoming[k] : (base[k] !== undefined ? base[k] : incoming[k]);
+    } else if ((base[k] && typeof base[k] === 'object') || (incoming[k] && typeof incoming[k] === 'object')){
+      const baseObj = (base[k] && typeof base[k] === 'object' && !Array.isArray(base[k])) ? base[k] : {};
+      out[k] = deepMerge(baseObj, incoming[k]);
+    } else {
+      out[k] = incoming[k];
+    }
   }
   return out;
 }
@@ -3793,10 +3816,20 @@ function renderRecipesPanel(){
         // ogóle (w innym przepisie mógłby jak najbardziej pasować), więc
         // globalna flaga na produkcie (excludeFromRecipes) tu nie pasuje.
         // "✕ nie pasuje" wyklucza go WYŁĄCZNIE dla tego składnika w tym
-        // przepisie (patrz toggleRecipeExclusion/state.recipeExclusions), a
-        // notka niżej pozwala to cofnąć bez grzebania w panelu admina.
+        // przepisie (patrz toggleRecipeExclusion/state.recipeExclusions).
+        //
+        // DOPRECYZOWANIE Dawida: to ma być narzędzie KURATORA (czyli Dawida),
+        // nie coś, co widzi/klika zwykły użytkownik appki — gdyby przyszły
+        // użytkownik zobaczył słabe dopasowanie (np. "Ryż na mleku" jako
+        // propozycja dla składnika "mleko"), nie pomyślałby "super, kliknę
+        // nie pasuje", tylko uznałby appkę za niedopracowaną. Dlatego sam
+        // PRZYCISK i notka o wykluczeniach są widoczne TYLKO w trybie
+        // ?admin=1 (ADMIN_MODE) — efekt wykluczenia (że dany produkt się już
+        // nie pojawia) obowiązuje zawsze, dla każdego widoku, tak samo jak
+        // przy excludeFromRecipes; zmienia się tylko to, KTO może podjąć tę
+        // decyzję.
         const excludedNames = excludedProductNamesFor(r.id, ing.name);
-        const excludedNoteHtml = excludedNames.length
+        const excludedNoteHtml = (ADMIN_MODE && excludedNames.length)
           ? '<div class="excl-note">Wykluczone dla tego przepisu: ' +
             excludedNames.map(n => '<span class="excl-chip">' + escapeHtml(n) + ' <button type="button" data-excl-undo-recipe="' + escapeHtml(r.id) + '" data-excl-undo-ing="' + escapeHtml(ing.name) + '" data-excl-undo-product="' + escapeHtml(n) + '" title="Przywróć to dopasowanie">↩</button></span>').join(' ') +
             '</div>'
@@ -3814,7 +3847,9 @@ function renderRecipesPanel(){
                 escapeHtml(c.name) + ' (' + escapeHtml(c.store) + ') · ' + formatPLN(c.price) + '</option>').join('') +
               '</select></div>'
             : '';
-          const exclBtnHtml = '<button type="button" class="excl-btn" data-excl-recipe="' + escapeHtml(r.id) + '" data-excl-ing="' + escapeHtml(ing.name) + '" data-excl-product="' + escapeHtml(p.name) + '" title="Ten konkretny produkt nie pasuje do tego przepisu">✕ nie pasuje</button>';
+          const exclBtnHtml = ADMIN_MODE
+            ? '<button type="button" class="excl-btn" data-excl-recipe="' + escapeHtml(r.id) + '" data-excl-ing="' + escapeHtml(ing.name) + '" data-excl-product="' + escapeHtml(p.name) + '" title="Ten konkretny produkt nie pasuje do tego przepisu">✕ nie pasuje</button>'
+            : '';
           const productBlock = '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + '</span>' +
             pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + exclBtnHtml + '</div>';
           return '<div class="ingredient-item matched">' + head + productBlock + excludedNoteHtml + '</div>';
