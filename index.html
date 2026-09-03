@@ -2689,13 +2689,86 @@ function wordStemsMatch(stem, w){
    żółta". Bardzo krótkie słówka (<=2 znaki: przyimki "z", "w", "do", "na")
    są pomijane przy nazwach wieloczłonowych, żeby np. "ser z kozy" nie
    wymagał od produktu dosłownego słowa "z". */
+/* ZGŁOSZONY BŁĄD (Dawid, na przykładzie "ser żółty" i "Spaghetti bolognese"):
+   powyższa funkcja od zawsze zakładała, że nazwa składnika to JEDNA rzecz do
+   dopasowania — a w danych przepisów regularnie pojawiają się ALTERNATYWY
+   ("banan LUB inne owoce", "jogurt lub śmietana") i przykładowe listy
+   ("warzywa (papryka, cukinia)", "pomidor, sałata, cebula"), gdzie
+   wystarczy, że pasuje KTÓRAKOLWIEK jedna z wymienionych rzeczy — nie
+   WSZYSTKIE naraz. Stare dopasowanie (jedna nazwa, wszystkie słowa muszą się
+   zgodzić) przy słowie "lub" próbowało dopasować literalnie słowo "lub" do
+   nazwy produktu, co nigdy się nie udawało — więc KAŻDY składnik z "lub" w
+   nazwie (aż ~40% wszystkich przepisów!) zawsze pokazywał "do dokupienia",
+   niezależnie od tego, co akurat było w promocji.
+
+   WAŻNE ROZRÓŻNIENIE (znalezione przy przeglądzie kodu, zanim ta zmiana
+   trafiła do Ciebie): nie każdy nawias to lista alternatyw! "krokiety (z
+   pieczarkami i serem)" czy "ryba (sandacz)" to nawiasy, które DOPRECYZOWUJĄ
+   główny człon (konkretne krokiety, konkretna ryba) — tu nadal musi pasować
+   CAŁOŚĆ, tak jak dotychczas, inaczej "krokiety (z pieczarkami i serem)"
+   zaczęłyby łapać też krokiety z zupełnie innym nadzieniem. Listą alternatyw
+   jest nawias/fragment TYLKO wtedy, gdy w środku jest przecinek albo "lub"
+   (np. "owoce (mango, winogrona)", "ser (feta lub halloumi)") — patrz
+   splitIngredientAlternatives(). */
+function splitIngredientAlternatives(ingredientName){
+  const norm = normalizePL(ingredientName);
+  const parenMatch = norm.match(/^(.*?)\(([^)]*)\)\s*$/);
+  if (parenMatch){
+    const before = parenMatch[1].trim();
+    const inner = parenMatch[2];
+    if (/,|\s+lub\s+/.test(inner)){
+      // Nawias zawiera LISTĘ (przecinek lub "lub") -> główny człon PRZED
+      // nawiasem i każdy element z nawiasu to osobne, niezależne alternatywy.
+      const items = inner.split(/\s+lub\s+|,/).map(s => s.trim()).filter(Boolean);
+      return (before ? [before] : []).concat(items);
+    }
+    // Nawias BEZ listy w środku -> to doprecyzowanie głównego członu, nie
+    // alternatywa -> traktujemy jako JEDNĄ frazę (jak przed tą naprawką).
+    return [(before + ' ' + inner).trim()].filter(Boolean);
+  }
+  // Bez nawiasu: "lub" i goły przecinek na najwyższym poziomie (np. "pomidor,
+  // sałata, cebula") zawsze dzielą na niezależne alternatywy.
+  return norm.split(/\s+lub\s+|,/).map(s => s.trim()).filter(Boolean);
+}
 function ingredientMatchesProduct(ingredientName, productName){
-  let ingredientWords = normalizePL(ingredientName).split(/[^a-z0-9]+/).filter(Boolean);
-  const significantWords = ingredientWords.filter(w => w.length > 2);
-  if (significantWords.length) ingredientWords = significantWords;
-  if (!ingredientWords.length) return false;
   const productWords = normalizePL(productName).split(/[^a-z0-9]+/).filter(Boolean);
-  return ingredientWords.every(stem => productWords.some(w => wordStemsMatch(stem, w)));
+  const alternatives = splitIngredientAlternatives(ingredientName);
+  if (!alternatives.length) return false;
+  return alternatives.some(alt => {
+    let words = alt.split(/[^a-z0-9]+/).filter(Boolean);
+    const significantWords = words.filter(w => w.length > 2);
+    if (significantWords.length) words = significantWords;
+    if (!words.length) return false;
+    if (isGenericFruitPhrase(words)) return fruitProductMatches(productName);
+    return words.every(stem => productWords.some(w => wordStemsMatch(stem, w)));
+  });
+}
+
+/* ZGŁOSZENIE Dawida: składniki typu "owoce", "owoce sezonowe" (bez
+   wskazania KONKRETNEGO owocu) zawsze pokazywały "do dokupienia", nawet gdy
+   w promocji było kilka konkretnych owoców (np. Ananas XL, Brzoskiwnie,
+   Maliny, Śliwki) — bo dopasowanie po słowach szuka dosłownie słowa "owoc"/
+   "owoce" W NAZWIE PRODUKTU, a sklepy piszą konkretne nazwy owoców, nie
+   ogólne słowo "owoc". Kategoria "Warzywa i owoce" sama w sobie też nie
+   wystarcza, bo łączy w Twoich danych ZARÓWNO warzywa, JAK I owoce — samo
+   filtrowanie po kategorii pokazywałoby też np. cebulę czy paprykę. Zamiast
+   tego: gdy alternatywa składnika (po odjęciu określeń typu "sezonowe",
+   "inne") sprowadza się do samego ogólnego słowa "owoc"/"owoce", dopasowujemy
+   po skończonej liście rdzeni najpopularniejszych owoców — więc taki
+   składnik pokaże KAŻDY owoc aktualnie w promocji (w tej samej kategorii),
+   a nie tylko literalne "owoce" w nazwie. */
+const FRUIT_NAME_STEMS = ['jablk','banan','ananas','brzosk','malin','sliwk','gruszk','winogr',
+  'mango','pomarancz','mandarynk','arbuz','melon','kiwi','cytryn','limonk','truskaw',
+  'jagod','wisni','czeresn','agrest','borowk','zurawin','morel','granat','awokado','fig',
+  'nektaryn','rabarbar','grejpfrut','datyl'];
+const FRUIT_FILLER_WORDS = ['sezonowe','sezonowy','sezonowych','inne','inny','inna','innych'];
+function isGenericFruitPhrase(words){
+  const core = words.filter(w => !FRUIT_FILLER_WORDS.includes(w));
+  return core.length === 1 && (core[0] === 'owoc' || core[0] === 'owoce');
+}
+function fruitProductMatches(productName){
+  const productWords = normalizePL(productName).split(/[^a-z0-9]+/).filter(Boolean);
+  return productWords.some(w => FRUIT_NAME_STEMS.some(stem => w.startsWith(stem)));
 }
 
 /* Znajduje WSZYSTKIE aktualnie aktywne produkty promocyjne pasujące do
