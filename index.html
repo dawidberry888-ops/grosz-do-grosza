@@ -494,12 +494,36 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .recipe-card .servings-picker button.active{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
 .recipe-card .instructions{font-size:0.8125rem; line-height:1.6; white-space:pre-wrap;}
 .recipe-card .ingredients-title{font-size:0.78125rem; font-weight:600; color:var(--ink-soft); margin-top:2px;}
-.missing-ingredient{
-  display:flex; justify-content:space-between; align-items:baseline; gap:8px;
-  padding:6px 2px; border-bottom:1px dashed var(--line); font-size:0.8125rem; color:var(--ink-faint);
+
+/* Lista składników przepisu — zgłoszenie Dawida: (1) nazwa ogólnego
+   składnika ("Twaróg") musi być widoczna OSOBNO od pełnej nazwy konkretnego
+   dopasowanego produktu w promocji ("Twaróg wiejski klinek Piątnica"), i (2)
+   cała lista nie może wyglądać jak jedna "ściana tekstu" — stąd ponumerowane,
+   wyraźnie oddzielone od siebie "kartki" (zamiast jednej listy z kreskowaną
+   linią), z kolorowym paskiem z boku pokazującym od razu, czy składnik jest
+   dziś w promocji (zielony) czy trzeba go dokupić (czerwonawy). Patrz
+   renderRecipesPanel().*/
+.recipe-card .ingredients{display:flex; flex-direction:column; gap:6px;}
+.ingredient-item{
+  border:1px solid var(--line); border-left:3px solid var(--line); border-radius:10px;
+  padding:8px 10px; background:var(--paper-raised);
 }
-.missing-ingredient:last-child{border-bottom:none;}
-.missing-ingredient .buy-tag{font-size:0.6875rem; color:var(--warn); white-space:nowrap;}
+.ingredient-item.matched{border-left-color:var(--growth);}
+.ingredient-item.missing{border-left-color:var(--warn);}
+.ingredient-item .ing-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.ingredient-item .ing-num{
+  flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink);
+  font-size:0.6875rem; font-weight:700; display:flex; align-items:center; justify-content:center;
+  font-family:'JetBrains Mono',monospace;
+}
+.ingredient-item .ing-name{font-weight:700; font-size:0.84375rem; color:var(--ink);}
+.ingredient-item .ing-amount{
+  font-size:0.6875rem; color:var(--ink-soft); background:var(--paper); border:1px solid var(--line);
+  border-radius:999px; padding:1px 8px; font-family:'JetBrains Mono',monospace; white-space:nowrap;
+}
+.ingredient-item .product-row{margin-top:6px;}
+.missing-ingredient{margin-top:4px; padding:0; border-bottom:none;}
+.missing-ingredient .buy-tag{font-size:0.75rem; font-weight:600; color:var(--warn); white-space:nowrap;}
 
 /* ============ KALENDARZ WYDATKÓW (Dziś) ============ */
 .cal-nav{display:flex; align-items:center; justify-content:space-between;}
@@ -637,6 +661,14 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:9px;}
 .manage-product-row.mp-expiring-soon{border-color:var(--warn); background:var(--warn-soft);}
 .manage-product-row.mp-expired{opacity:.6;}
 .manage-product-row .mp-expiry-warning{color:var(--warn); font-weight:700;}
+/* Flaga "to nie jest surowy składnik" (zgłoszenie Dawida: "Twaróg wiejski
+   klinek Piątnica" i "Koreczki twarogowe..." mają tę samą kategorię sklepową
+   — kategoria sama nie wystarczy, patrz komentarz przy matchIngredientToActiveProducts) */
+.manage-product-row .mp-exclude-field{
+  display:flex; align-items:flex-start; gap:6px; font-size:0.75rem; color:var(--ink-soft);
+  line-height:1.4; padding:2px 0;
+}
+.mp-exclude-badge{color:var(--warn);}
 
 .empty-state{
   text-align:center; padding:28px 12px; color:var(--ink-faint); font-size:0.8125rem; line-height:1.6;
@@ -2382,6 +2414,10 @@ function productFromRemoteFeedRow(row){
     freeQty: extractFreeQty(row.freeQty),
     priceReports: [],
     source: 'remote',
+    // Domyślnie false — feed nigdy nie ustawia tego pola; wartość TRUE może
+    // tu trafić tylko przez przeniesienie z poprzedniej wersji tego samego
+    // produktu przy odświeżeniu, patrz fetchRemoteFeed().
+    excludeFromRecipes: !!row.excludeFromRecipes,
   };
 }
 
@@ -2435,7 +2471,14 @@ async function fetchRemoteFeed(opts){
       const match = oldRemote.find(oldP =>
         oldP.name.trim().toLowerCase() === newP.name.trim().toLowerCase() &&
         oldP.store.trim().toLowerCase() === newP.store.trim().toLowerCase());
-      if (match) idRemap.set(match.id, newP.id);
+      if (match){
+        idRemap.set(match.id, newP.id);
+        // Flaga "pomiń w przepisach" (excludeFromRecipes) jest ręcznym
+        // ustawieniem Dawida na KONKRETNYM produkcie — bez tego przeniesienia
+        // znikałaby po cichu przy każdym kolejnym pobraniu świeżej listy
+        // promocji (patrz komentarz przy matchIngredientToActiveProducts).
+        newP.excludeFromRecipes = !!match.excludeFromRecipes;
+      }
     });
     state.shoppingList = state.shoppingList.map(entry => ({ ...entry, id: idRemap.get(entry.id) || entry.id }));
 
@@ -2656,7 +2699,7 @@ function ingredientMatchesProduct(ingredientName, productName){
    też do "Krokiety z pieczarkami i serem" (danie gotowe), a "cebula"
    (warzywo) do "Metka cebulowa" (wędlina), bo oba te produkty MAJĄ takie
    słowo w nazwie, tylko jako opis smaku/nadzienia, nie jako sam surowiec.
-   Naprawka: każdy składnik może mieć teraz opcjonalną `category` (jedna z
+   Naprawka #1: każdy składnik może mieć teraz opcjonalną `category` (jedna z
    PRODUCT_CATEGORIES, ustawiana w panelu admina przy pisaniu przepisu) —
    gdy jest ustawiona, dopasowanie jest ŚCISŁE i bierze pod uwagę TYLKO
    produkty z DOKŁADNIE tej samej kategorii, więc "cebula" (Warzywa i owoce)
@@ -2664,11 +2707,27 @@ function ingredientMatchesProduct(ingredientName, productName){
    słowo w nazwie by pasowało. Składniki BEZ ustawionej kategorii (stare
    przepisy sprzed tej zmiany, albo świadomie zostawione puste) zachowują
    się jak dawniej — dopasowanie tylko po nazwie, bez ograniczenia do
-   kategorii. */
+   kategorii.
+
+   NASTĘPNY ZGŁOSZONY BŁĄD (Dawid): sama kategoria SKLEPOWA to za mało —
+   "Twaróg wiejski klinek Piątnica" i "Koreczki twarogowe Tartare Aperitif"
+   są w jego danych OBIE w kategorii "Nabiał" (bo tak są ułożone na półce),
+   mimo że koreczki to gotowa przekąska, nie surowy twaróg. To samo słowo
+   ("twarogowe") jest tu językowo tym samym rdzeniem co "twaróg" — więc ani
+   kategoria, ani dopasowanie po słowach tego nie rozróżni, to kwestia
+   ZNACZENIA produktu, nie jego nazwy czy działu sklepu. Naprawka #2 (wybór
+   Dawida z AskUserQuestion, opcja "Flaga na produkcie"): opcjonalne pole
+   `excludeFromRecipes` na PRODUKCIE (ustawiane raz w „Zarządzaj listą” →
+   Edytuj, patrz manageProductRowHtml) — gdy prawdziwe, ten produkt nigdy nie
+   trafi do dopasowań ŻADNEGO składnika w ŻADNYM przepisie, teraz ani w
+   przyszłości. Flaga jest trwała: fetchRemoteFeed() przenosi ją na świeżo
+   pobrany odpowiednik tego samego produktu (dopasowanie po nazwie+sklepie),
+   więc kolejne cotygodniowe pobranie promocji jej nie kasuje. */
 function matchIngredientToActiveProducts(ingredient, activeProducts){
   const ingredientName = (ingredient && ingredient.name) || '';
   const ingredientCategory = (ingredient && ingredient.category) || '';
   const matches = activeProducts.filter(p =>
+    !p.excludeFromRecipes &&
     (!ingredientCategory || p.category === ingredientCategory) &&
     ingredientMatchesProduct(ingredientName, p.name)
   );
@@ -3561,8 +3620,22 @@ function renderRecipesPanel(){
     const servingsFactor = selectedServings / baseServings;
     let body = '';
     if (expanded){
+      // Przebudowa wyglądu listy składników (zgłoszenie Dawida):
+      // 1. Nazwa składnika (ogólna, np. "Twaróg") jest teraz ZAWSZE osobną,
+      //    pierwszoplanową etykietą — dawniej, gdy trafiał się konkretny
+      //    dopasowany produkt, appka pokazywała TYLKO jego pełną nazwę
+      //    ("Twaróg wiejski klinek Piątnica"), przez co znikało, jaki to
+      //    właściwie ogólny składnik. Teraz nazwa składnika jest zawsze na
+      //    górze, a dopasowany produkt (jeśli jest) — pod spodem, osobno.
+      // 2. Każdy składnik jest teraz ponumerowaną, osobną "kartą" z kolorowym
+      //    paskiem z boku (zielony = dopasowany, czerwonawy = do dokupienia)
+      //    zamiast jednej długiej listy oddzielonej kreskowaną linią — Dawid:
+      //    "żeby oprócz funkcjonalności było to też wizualnie ładne,
+      //    współczesne... nie możemy wzroku i głowy zawalić ścianą tekstu".
       const rows = matches.map(({ ing, idx, product: p, candidates }) => {
         const scaledAmount = scaleAmountText(ing.amount, servingsFactor);
+        const amountHtml = scaledAmount ? '<span class="ing-amount">' + escapeHtml(scaledAmount) + '</span>' : '';
+        const head = '<div class="ing-head"><span class="ing-num">' + (idx + 1) + '</span><span class="ing-name">' + escapeHtml(ing.name) + '</span>' + amountHtml + '</div>';
         if (p){
           // Kilka pasujących produktów naraz (np. kilka różnych szynek w
           // promocji) — zgłoszenie Dawida: zamiast po cichu chować resztę,
@@ -3576,17 +3649,18 @@ function renderRecipesPanel(){
                 escapeHtml(c.name) + ' (' + escapeHtml(c.store) + ') · ' + formatPLN(c.price) + '</option>').join('') +
               '</select></div>'
             : '';
-          return '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span> · ' + escapeHtml(scaledAmount) + '</span><span class="pprice">' + formatPLN(p.price) + '</span>' +
+          const productBlock = '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + '</span>' +
             pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + '</div>';
+          return '<div class="ingredient-item matched">' + head + productBlock + '</div>';
         }
-        return '<div class="missing-ingredient"><span>' + escapeHtml(ing.name) + (scaledAmount ? ' <span class="hint">(' + escapeHtml(scaledAmount) + ')</span>' : '') + '</span><span class="buy-tag">do dokupienia</span></div>';
+        return '<div class="ingredient-item missing">' + head + '<div class="missing-ingredient"><span class="buy-tag">🛒 do dokupienia</span></div></div>';
       }).join('');
       const servingsPickerHtml = '<span class="servings-picker">' + [2, 4, 6].map(n =>
         '<button type="button" class="' + (n === selectedServings ? 'active' : '') + '" data-servings-pick="' + escapeHtml(r.id) + '" data-servings-value="' + n + '">' + n + '</button>'
       ).join('') + '</span>';
       body = '<div class="body">' +
         '<div class="servings">🍽️ Liczba porcji: <strong>' + selectedServings + '</strong>' + servingsPickerHtml + '</div>' +
-        '<div><div class="ingredients-title">Składniki</div>' + rows + '</div>' +
+        '<div><div class="ingredients-title">Składniki</div><div class="ingredients">' + rows + '</div></div>' +
         (r.instructions ? '<div><div class="ingredients-title">Przygotowanie</div><div class="instructions">' + escapeHtml(r.instructions) + '</div></div>' : '') +
         '</div>';
     }
@@ -4433,6 +4507,7 @@ function manageProductRowHtml(p){
         '<div class="field"><label>Ilość wymagana do promocji</label><input type="text" inputmode="text" data-mp-field="promoQty" value="' + ((p.promoQty && p.promoQty > 1) ? p.promoQty : '') + '" placeholder="np. 2 albo „przy zakupie 2” — zostaw puste, jeśli bez warunku"></div>' +
         '<div class="field"><label>Ile sztuk gratis</label><input type="text" inputmode="text" data-mp-field="freeQty" value="' + ((p.freeQty && p.freeQty > 0) ? p.freeQty : '') + '" placeholder="dowolna liczba, np. 1 (2+1), 2 (2+2), 3 (2+3) — puste, jeśli brak"></div>' +
       '</div>' +
+      '<label class="mp-exclude-field"><input type="checkbox" data-mp-field="excludeFromRecipes"' + (p.excludeFromRecipes ? ' checked' : '') + '> 🚫 To nie jest surowy składnik (gotowa przekąska/danie) — pomiń w dopasowaniach do przepisów</label>' +
       '<div class="row">' +
         '<button type="button" class="btn btn-primary btn-sm" data-mp-save="' + p.id + '">Zapisz</button>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-mp-cancel="' + p.id + '">Anuluj</button>' +
@@ -4449,7 +4524,7 @@ function manageProductRowHtml(p){
   else if (expiringSoon) expiryBadge = ' · <span class="mp-expiry-warning">⚠️ kończy się ' + (daysLeft <= 0 ? 'dziś' : daysLeft === 1 ? 'jutro' : 'za ' + daysLeft + ' dni') + '</span>';
   return '<div class="manage-product-row' + rowWarnClass + '" data-mp-id="' + p.id + '">' +
     '<div class="mp-main"><span class="mp-name">' + escapeHtml(p.name) + '</span><span class="mp-price">' + formatPLN(p.price) + '</span></div>' +
-    '<div class="mp-meta">' + escapeHtml(p.store) + ' · ' + escapeHtml(p.category || DEFAULT_CATEGORY) + (p.unitSize ? ' · ' + escapeHtml(p.unitSize) : '') + (p.card ? ' · 🪪 ' + escapeHtml(p.card) : '') + ((p.promoQty && p.promoQty > 1) ? ' · 🔢 przy ' + p.promoQty + ' szt.' : '') + ((p.freeQty && p.freeQty > 0) ? ' · 🎁 ' + p.freeQty + ' gratis' : '') + expiryBadge + '</div>' +
+    '<div class="mp-meta">' + escapeHtml(p.store) + ' · ' + escapeHtml(p.category || DEFAULT_CATEGORY) + (p.unitSize ? ' · ' + escapeHtml(p.unitSize) : '') + (p.card ? ' · 🪪 ' + escapeHtml(p.card) : '') + ((p.promoQty && p.promoQty > 1) ? ' · 🔢 przy ' + p.promoQty + ' szt.' : '') + ((p.freeQty && p.freeQty > 0) ? ' · 🎁 ' + p.freeQty + ' gratis' : '') + expiryBadge + (p.excludeFromRecipes ? ' · <span class="mp-exclude-badge">🚫 pomijany w przepisach</span>' : '') + '</div>' +
     '<div class="row">' +
       '<button type="button" class="btn btn-ghost btn-sm" data-mp-edit="' + p.id + '">Edytuj</button>' +
       '<button type="button" class="btn btn-danger-ghost btn-sm" data-mp-delete="' + p.id + '">Usuń</button>' +
@@ -5215,7 +5290,8 @@ function bindEvents(){
         unitSize: unit ? unit.raw : '', unitGrams: unit ? unit.grams : null, unitMl: unit ? unit.ml : null,
         promoQty, freeQty,
         priceReports: [],
-        source: 'manual'
+        source: 'manual',
+        excludeFromRecipes: false,
       };
     }).filter(Boolean);
   }
@@ -5400,6 +5476,7 @@ function bindEvents(){
       product.unitMl = unit ? unit.ml : null;
       product.promoQty = extractPromoQty(val('promoQty'));
       product.freeQty = extractFreeQty(val('freeQty'));
+      product.excludeFromRecipes = row.querySelector('[data-mp-field="excludeFromRecipes"]').checked;
       editingProductId = null;
       renderAll();
       await persist('Zapisano zmiany w „' + name + '”.');
