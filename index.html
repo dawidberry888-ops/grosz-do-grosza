@@ -2563,7 +2563,12 @@ function recipeFromFeedRow(row){
         if (!i || typeof i !== 'object') return null;
         const iname = String(i.name || '').trim();
         if (!iname) return null;
-        return { name: iname, amount: String(i.amount || '').trim() };
+        // `category` (opcjonalna, jedna z PRODUCT_CATEGORIES) ogranicza
+        // dopasowanie tego składnika TYLKO do produktów z tej samej
+        // kategorii — patrz matchIngredientToActiveProducts. Nieznana/pusta
+        // wartość -> '' (dopasowanie tylko po nazwie, jak dawniej).
+        const icategory = PRODUCT_CATEGORIES.includes(i.category) ? i.category : '';
+        return { name: iname, amount: String(i.amount || '').trim(), category: icategory };
       }).filter(Boolean)
     : [];
   if (!ingredients.length) return null;
@@ -2644,9 +2649,29 @@ function ingredientMatchesProduct(ingredientName, productName){
    liście), zanim Dawid sam czegoś wybierze: najpierw najbliższy sklep (gdy
    appka zna lokalizację — patrz storeDistanceKm), potem najtańszy jako
    naturalny tiebreak (i jedyne kryterium, gdy lokalizacja nie jest ustawiona
-   — wtedy storeDistanceKm zwraca null dla każdego sklepu). */
-function matchIngredientToActiveProducts(ingredientName, activeProducts){
-  const matches = activeProducts.filter(p => ingredientMatchesProduct(ingredientName, p.name));
+   — wtedy storeDistanceKm zwraca null dla każdego sklepu).
+
+   ZGŁOSZONY BŁĄD (Dawid): samo dopasowanie po słowach potrafiło trafić
+   kompletnie obok tematu — składnik "pieczarki" (warzywo) dopasowywał się
+   też do "Krokiety z pieczarkami i serem" (danie gotowe), a "cebula"
+   (warzywo) do "Metka cebulowa" (wędlina), bo oba te produkty MAJĄ takie
+   słowo w nazwie, tylko jako opis smaku/nadzienia, nie jako sam surowiec.
+   Naprawka: każdy składnik może mieć teraz opcjonalną `category` (jedna z
+   PRODUCT_CATEGORIES, ustawiana w panelu admina przy pisaniu przepisu) —
+   gdy jest ustawiona, dopasowanie jest ŚCISŁE i bierze pod uwagę TYLKO
+   produkty z DOKŁADNIE tej samej kategorii, więc "cebula" (Warzywa i owoce)
+   już nigdy nie pokaże "Metka cebulowa" (Mięso i wędliny), nawet jeśli
+   słowo w nazwie by pasowało. Składniki BEZ ustawionej kategorii (stare
+   przepisy sprzed tej zmiany, albo świadomie zostawione puste) zachowują
+   się jak dawniej — dopasowanie tylko po nazwie, bez ograniczenia do
+   kategorii. */
+function matchIngredientToActiveProducts(ingredient, activeProducts){
+  const ingredientName = (ingredient && ingredient.name) || '';
+  const ingredientCategory = (ingredient && ingredient.category) || '';
+  const matches = activeProducts.filter(p =>
+    (!ingredientCategory || p.category === ingredientCategory) &&
+    ingredientMatchesProduct(ingredientName, p.name)
+  );
   matches.sort((a, b) => {
     const da = storeDistanceKm(a.store), db = storeDistanceKm(b.store);
     if (da !== null && db !== null && da !== db) return da - db;
@@ -2673,7 +2698,7 @@ function ingredientChoiceKey(p){
    ZWINIĘTYCH kart, których nikt jeszcze nie otworzył. */
 function recipeMatchStats(recipe, activeProducts){
   const total = recipe.ingredients.length;
-  const matchedCount = recipe.ingredients.filter(ing => matchIngredientToActiveProducts(ing.name, activeProducts).length > 0).length;
+  const matchedCount = recipe.ingredients.filter(ing => matchIngredientToActiveProducts(ing, activeProducts).length > 0).length;
   return { matchedCount, total, ratio: total ? matchedCount / total : 0 };
 }
 
@@ -3517,7 +3542,7 @@ function renderRecipesPanel(){
   el.innerHTML = shown.map(({ r, stats }) => {
     const choices = recipeIngredientChoice[r.id] || {};
     const matches = r.ingredients.map((ing, idx) => {
-      const candidates = matchIngredientToActiveProducts(ing.name, activeProducts);
+      const candidates = matchIngredientToActiveProducts(ing, activeProducts);
       const chosenKey = choices[idx];
       const chosen = chosenKey ? candidates.find(p => ingredientChoiceKey(p) === chosenKey) : null;
       return { ing, idx, product: chosen || candidates[0] || null, candidates };
