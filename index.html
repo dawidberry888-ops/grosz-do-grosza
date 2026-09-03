@@ -1240,6 +1240,12 @@ nav.tabbar{
         <input type="checkbox" id="recipeMatchFilterToggle" style="width:auto;"> Pokaż tylko przepisy, w których ponad połowa składników jest w promocji
       </label>
       <div id="recipesList"></div>
+      <!-- Widoczne tylko w ?admin=1 (chowane niżej, tak jak "Zarządzaj
+           listą") — patrz komentarz przy matchIngredientToActiveProducts:
+           lokalne "✕ nie pasuje" trzeba PRZENIEŚĆ do panelu administracyjnego
+           (import pliku stąd), żeby zaczęło obowiązywać u każdego, nie tylko
+           na tym urządzeniu. -->
+      <button type="button" class="btn btn-ghost btn-sm" id="exportRecipeExclusionsBtn" style="margin-top:10px;">⬇️ Eksportuj wykluczenia dla panelu administratora</button>
     </div>
   </section>
 
@@ -2655,7 +2661,19 @@ function recipeFromFeedRow(row){
         // kategorii — patrz matchIngredientToActiveProducts. Nieznana/pusta
         // wartość -> '' (dopasowanie tylko po nazwie, jak dawniej).
         const icategory = PRODUCT_CATEGORIES.includes(i.category) ? i.category : '';
-        return { name: iname, amount: String(i.amount || '').trim(), category: icategory };
+        // `excludedProducts` (opcjonalna, ustawiana w panelu administracyjnym —
+        // patrz isProductExcludedByIngredientData) — lista KONKRETNYCH nazw
+        // produktów, które mimo pasującej nazwy/kategorii NIE są dobrą
+        // propozycją dla tego składnika w tym przepisie. BEZ tego mapowania
+        // pole ginęłoby tu po cichu przy każdym pobraniu z gista, a appka
+        // znów pokazywałaby wykluczone produkty (dokładnie ten błąd zgłosił
+        // Dawid: "kurde... ja to zmieniam, a aktualizuje się wszędzie").
+        const excludedProducts = Array.isArray(i.excludedProducts)
+          ? i.excludedProducts.map(n => String(n || '').trim()).filter(Boolean)
+          : [];
+        const ing = { name: iname, amount: String(i.amount || '').trim(), category: icategory };
+        if (excludedProducts.length) ing.excludedProducts = excludedProducts;
+        return ing;
       }).filter(Boolean)
     : [];
   if (!ingredients.length) return null;
@@ -2751,7 +2769,25 @@ function splitIngredientAlternatives(ingredientName){
   }
   // Bez nawiasu: "lub" i goły przecinek na najwyższym poziomie (np. "pomidor,
   // sałata, cebula") zawsze dzielą na niezależne alternatywy.
-  return norm.split(/\s+lub\s+|,/).map(s => s.trim()).filter(Boolean);
+  //
+  // ZGŁOSZENIE Dawida ("Smoothie bowl z granolą" — "owoce mrożone lub
+  // świeże" pokazywało "do dokupienia" mimo świeżych owoców w promocji):
+  // druga część takiego zdania to sam PRZYMIOTNIK ("świeże") opisujący TEN
+  // SAM rzeczownik co pierwsza część ("owoce") — nie jest samodzielną
+  // alternatywą. Rozdzielona samodzielnie ("świeże") nigdy by niczego nie
+  // dopasowała, bo żaden produkt nie nazywa się dosłownie "świeże". Gdy
+  // człon po "lub"/przecinku to WYŁĄCZNIE pojedynczy taki przymiotnik (patrz
+  // FRUIT_FILLER_WORDS — te same słowa, którymi appka i tak "odchudza"
+  // frazy przy rozpoznawaniu gołego "owoce"/"owoc"), dziedziczy rzeczownik z
+  // PIERWSZEGO członu całej frazy — "świeże" staje się więc "owoce świeże".
+  const rawParts = norm.split(/\s+lub\s+|,/).map(s => s.trim()).filter(Boolean);
+  const firstWord = (rawParts[0] || '').split(/[^a-z0-9]+/).filter(Boolean)[0] || '';
+  return rawParts.map((part, i) => {
+    if (i === 0 || !firstWord) return part;
+    const partWords = part.split(/[^a-z0-9]+/).filter(Boolean);
+    if (partWords.length === 1 && FRUIT_FILLER_WORDS.includes(partWords[0])) return firstWord + ' ' + part;
+    return part;
+  });
 }
 function ingredientMatchesProduct(ingredientName, productName){
   const productWords = normalizePL(productName).split(/[^a-z0-9]+/).filter(Boolean);
@@ -2776,15 +2812,26 @@ function ingredientMatchesProduct(ingredientName, productName){
    wystarcza, bo łączy w Twoich danych ZARÓWNO warzywa, JAK I owoce — samo
    filtrowanie po kategorii pokazywałoby też np. cebulę czy paprykę. Zamiast
    tego: gdy alternatywa składnika (po odjęciu określeń typu "sezonowe",
-   "inne") sprowadza się do samego ogólnego słowa "owoc"/"owoce", dopasowujemy
-   po skończonej liście rdzeni najpopularniejszych owoców — więc taki
-   składnik pokaże KAŻDY owoc aktualnie w promocji (w tej samej kategorii),
-   a nie tylko literalne "owoce" w nazwie. */
+   "inne", "suszone"...) sprowadza się do samego ogólnego słowa "owoc"/
+   "owoce", dopasowujemy po skończonej liście rdzeni najpopularniejszych
+   owoców — więc taki składnik pokaże KAŻDY owoc aktualnie w promocji (w tej
+   samej kategorii), a nie tylko literalne "owoce" w nazwie.
+
+   NASTĘPNE ZGŁOSZENIE (Dawid, "Jogurt grecki z granolą i suszonymi
+   owocami" — składnik "owoce suszone" nie łapał produktów w promocji mimo
+   że były): "suszone" samo w sobie jest tu tylko OKREŚLENIEM formy owocu
+   (podobnie jak "sezonowe"), a nie osobnym wymogiem — żaden produkt nie
+   będzie się nazywał dosłownie "owoce suszone", więc bez dopisania go do
+   FRUIT_FILLER_WORDS to dopasowanie było tak samo martwe jak "owoce
+   sezonowe" przed poprzednią naprawką. Lista FRUIT_NAME_STEMS ma już rdzeń
+   "zurawin" (żurawina — klasyczny suszony owoc), więc to wystarcza. */
 const FRUIT_NAME_STEMS = ['jablk','banan','ananas','brzosk','malin','sliwk','gruszk','winogr',
   'mango','pomarancz','mandarynk','arbuz','melon','kiwi','cytryn','limonk','truskaw',
   'jagod','wisni','czeresn','agrest','borowk','zurawin','morel','granat','awokado','fig',
   'nektaryn','rabarbar','grejpfrut','datyl'];
-const FRUIT_FILLER_WORDS = ['sezonowe','sezonowy','sezonowych','inne','inny','inna','innych'];
+const FRUIT_FILLER_WORDS = ['sezonowe','sezonowy','sezonowych','inne','inny','inna','innych',
+  'suszone','suszony','suszona','suszonych','mrozone','mrozony','mrozona','mrozonych',
+  'swieze','swiezy','swieza','swiezych'];
 function isGenericFruitPhrase(words){
   const core = words.filter(w => !FRUIT_FILLER_WORDS.includes(w));
   return core.length === 1 && (core[0] === 'owoc' || core[0] === 'owoce');
@@ -2865,13 +2912,59 @@ function isProductExcludedForIngredient(recipeId, ingredientName, productName){
   const target = normalizePL(productName);
   return excludedProductNamesFor(recipeId, ingredientName).some(n => normalizePL(n) === target);
 }
+/* ZGŁOSZENIE Dawida ("kurde, przecież mam wrażenie że wciąż o tym piszę. Ja
+   to zmieniam, a aktualizuje się wszędzie. Przecież nie robię appki dla
+   siebie tylko dla Użytkowników!"): wykluczenia z state.recipeExclusions
+   (wyżej) trzymają się TYLKO lokalnej pamięci TEGO urządzenia — dobre do
+   szybkiego testowania, ale nigdy nie dotrą do innych urządzeń/przyszłych
+   użytkowników appki, bo appka nie ma jak wysłać ich NIGDZIE indziej sama z
+   siebie (bez wpisanego na stałe tokena do GitHuba, którego appka
+   użytkowników świadomie nigdy nie trzyma — to byłaby dziura bezpieczeństwa
+   po opublikowaniu appki). Naprawka: składnik przepisu może teraz nieść
+   WŁASNE pole `excludedProducts` — CZĘŚĆ danych przepisu, przychodzącą (jak
+   cała reszta przepisu) z tego samego gista co promocje (RECIPES_FEED_URL).
+   Dawid ustawia je raz w panelu administracyjnym (ręcznie albo importem
+   pliku wyeksportowanego stąd — patrz "Eksportuj wykluczenia dla panelu
+   administratora" w renderRecipesPanel) i klika "Zapisz do GitHub" — od tej
+   chwili obowiązuje to u KAŻDEGO, natychmiast, bez osobnego klikania na
+   każdym urządzeniu. state.recipeExclusions zostaje jako szybki, lokalny
+   podgląd/test PRZED opublikowaniem tej decyzji — obie listy się sumują. */
+function isProductExcludedByIngredientData(ingredient, productName){
+  const list = (ingredient && Array.isArray(ingredient.excludedProducts)) ? ingredient.excludedProducts : [];
+  if (!list.length) return false;
+  const target = normalizePL(productName);
+  return list.some(n => normalizePL(n) === target);
+}
+/* ZGŁOSZENIE Dawida ("pieczywo" w "Kanapki z pastą jajeczną i rzodkiewką" —
+   nigdy nie pokazuje wyboru, mimo chleba/bułek w promocji): ten sam
+   mechanizm co przy "owoce"/"owoc" (patrz FRUIT_NAME_STEMS wyżej) — nazwa
+   składnika to sam OGÓLNY termin kategorii, którego żaden konkretny produkt
+   nigdy nie będzie miał dosłownie w nazwie (sklep pisze "Chleb żytni",
+   "Bułki pszenne", nie "Pieczywo XYZ"). W przeciwieństwie do "owoce" appka
+   nie potrzebuje tu osobnej, ręcznie skompletowanej listy rdzeni — "Pieczywo"
+   (w odróżnieniu od "Warzywa i owoce") to kategoria jednorodna, nie łącząca
+   dwóch różnych rzeczy, więc gdy CAŁA (nie tylko jedna alternatywa po "lub")
+   nazwa składnika to pojedyncze słowo współdzielące rdzeń z WŁASNĄ kategorią
+   składnika, każdy produkt z tej kategorii (i tak już odfiltrowany niżej) po
+   prostu pasuje — bez potrzeby dopasowania po nazwie wcale. Świadomie
+   pomijamy tu jedyną kategorię, która łączy dwa różne pojęcia
+   ("Warzywa i owoce") — tam o precyzję dba już curated FRUIT_NAME_STEMS. */
+function isGenericCategoryWord(ingredientName, ingredientCategory){
+  if (!ingredientCategory || ingredientCategory === 'Warzywa i owoce') return false;
+  const words = normalizePL(ingredientName).split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.length !== 1) return false;
+  const categoryWords = normalizePL(ingredientCategory).split(/[^a-z0-9]+/).filter(Boolean).filter(w => w.length > 2);
+  return categoryWords.some(cw => wordStemsMatch(words[0], cw));
+}
 function matchIngredientToActiveProducts(ingredient, activeProducts, recipeId){
   const ingredientName = (ingredient && ingredient.name) || '';
   const ingredientCategory = (ingredient && ingredient.category) || '';
+  const genericCategoryMatch = isGenericCategoryWord(ingredientName, ingredientCategory);
   const matches = activeProducts.filter(p =>
     !p.excludeFromRecipes &&
     (!ingredientCategory || p.category === ingredientCategory) &&
-    ingredientMatchesProduct(ingredientName, p.name) &&
+    (genericCategoryMatch || ingredientMatchesProduct(ingredientName, p.name)) &&
+    !isProductExcludedByIngredientData(ingredient, p.name) &&
     !(recipeId && isProductExcludedForIngredient(recipeId, ingredientName, p.name))
   );
   matches.sort((a, b) => {
@@ -3829,9 +3922,22 @@ function renderRecipesPanel(){
         // przy excludeFromRecipes; zmienia się tylko to, KTO może podjąć tę
         // decyzję.
         const excludedNames = excludedProductNamesFor(r.id, ing.name);
+        // Lokalne (jeszcze niepublikowane, patrz toggleRecipeExclusion) — z
+        // przyciskiem cofnięcia, bo to Dawid może jeszcze zmienić zdanie tu i teraz.
         const excludedNoteHtml = (ADMIN_MODE && excludedNames.length)
-          ? '<div class="excl-note">Wykluczone dla tego przepisu: ' +
+          ? '<div class="excl-note">Wykluczone lokalnie (jeszcze niepublikowane): ' +
             excludedNames.map(n => '<span class="excl-chip">' + escapeHtml(n) + ' <button type="button" data-excl-undo-recipe="' + escapeHtml(r.id) + '" data-excl-undo-ing="' + escapeHtml(ing.name) + '" data-excl-undo-product="' + escapeHtml(n) + '" title="Przywróć to dopasowanie">↩</button></span>').join(' ') +
+            '</div>'
+          : '';
+        // Już OPUBLIKOWANE (przyszły z gista razem z resztą przepisu, patrz
+        // ingredient.excludedProducts/isProductExcludedByIngredientData) —
+        // wyłącznie do wglądu, bez przycisku cofnięcia: edycja tego pola
+        // dzieje się w panelu administracyjnym (tam, gdzie faktycznie zmienia
+        // się dane w giście), nie tutaj.
+        const publishedExcluded = Array.isArray(ing.excludedProducts) ? ing.excludedProducts.filter(Boolean) : [];
+        const publishedExcludedNoteHtml = (ADMIN_MODE && publishedExcluded.length)
+          ? '<div class="excl-note">Wykluczone dla wszystkich (panel administracyjny): ' +
+            publishedExcluded.map(n => '<span class="excl-chip">' + escapeHtml(n) + '</span>').join(' ') +
             '</div>'
           : '';
         if (p){
@@ -3852,9 +3958,9 @@ function renderRecipesPanel(){
             : '';
           const productBlock = '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + '</span>' +
             pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + exclBtnHtml + '</div>';
-          return '<div class="ingredient-item matched">' + head + productBlock + excludedNoteHtml + '</div>';
+          return '<div class="ingredient-item matched">' + head + productBlock + excludedNoteHtml + publishedExcludedNoteHtml + '</div>';
         }
-        return '<div class="ingredient-item missing">' + head + '<div class="missing-ingredient"><span class="buy-tag">🛒 do dokupienia</span></div>' + excludedNoteHtml + '</div>';
+        return '<div class="ingredient-item missing">' + head + '<div class="missing-ingredient"><span class="buy-tag">🛒 do dokupienia</span></div>' + excludedNoteHtml + publishedExcludedNoteHtml + '</div>';
       }).join('');
       const servingsPickerHtml = '<span class="servings-picker">' + [2, 4, 6].map(n =>
         '<button type="button" class="' + (n === selectedServings ? 'active' : '') + '" data-servings-pick="' + escapeHtml(r.id) + '" data-servings-value="' + n + '">' + n + '</button>'
@@ -4987,6 +5093,45 @@ function bindEvents(){
     showToast('Pobrano kopię zapasową.');
   });
 
+  // Eksport wykluczeń "✕ nie pasuje" (state.recipeExclusions, patrz komentarz
+  // przy matchIngredientToActiveProducts) do pliku, który panel administracyjny
+  // (grosz-do-grosza-admin.html) potrafi zaimportować — dopasowuje po NAZWIE
+  // dania + NAZWIE składnika (nie po id, bo id przepisu i tak zmienia się przy
+  // każdym zapisie w panelu). Dopiero import tam i "Zapisz do GitHub" sprawia,
+  // że wykluczenie kliknięte tutaj zaczyna obowiązywać u każdego.
+  const exportExclusionsBtnEl = document.getElementById('exportRecipeExclusionsBtn');
+  if (exportExclusionsBtnEl) exportExclusionsBtnEl.addEventListener('click', () => {
+    const recipesById = new Map(state.recipes.map(r => [r.id, r]));
+    const exclusions = [];
+    Object.keys(state.recipeExclusions || {}).forEach(recipeId => {
+      const recipe = recipesById.get(recipeId);
+      if (!recipe) return; // przepis od tego czasu zniknął/zmienił id (patrz komentarz o niestałym id) — nic do wyeksportowania
+      const forRecipe = state.recipeExclusions[recipeId] || {};
+      Object.keys(forRecipe).forEach(normalizedIngKey => {
+        const products = forRecipe[normalizedIngKey];
+        if (!Array.isArray(products) || !products.length) return;
+        // Nazwę składnika bierzemy z AKTUALNEGO przepisu (nie z klucza, który
+        // jest znormalizowany/bez polskich znaków) — dopasowanie w panelu
+        // administracyjnym idzie po prawdziwej nazwie.
+        const ing = recipe.ingredients.find(i => normalizePL(i.name) === normalizedIngKey);
+        if (!ing) return;
+        exclusions.push({ recipeName: recipe.name, ingredientName: ing.name, excludedProducts: products });
+      });
+    });
+    if (!exclusions.length){ showToast('Brak lokalnych wykluczeń do wyeksportowania.'); return; }
+    const payload = { app: 'grosz-do-grosza', exportedAt: new Date().toISOString(), exclusions };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'grosz-do-grosza-wykluczenia-' + todayDateKey() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Pobrano ' + exclusions.length + ' wykluczeń — zaimportuj plik w panelu administracyjnym.');
+  });
+
   document.getElementById('importDataBtn').addEventListener('click', () => {
     document.getElementById('importDataInput').click();
   });
@@ -6048,6 +6193,8 @@ if (!ADMIN_MODE){
   // .hidden (atrybutu) nic by nie dało — trzeba nadpisać display wprost.
   const manageListCard = document.getElementById('toggleManageList').closest('.card');
   if (manageListCard) manageListCard.style.display = 'none';
+  const exportExclusionsBtn = document.getElementById('exportRecipeExclusionsBtn');
+  if (exportExclusionsBtn) exportExclusionsBtn.style.display = 'none';
 }
 
 renderAll();
