@@ -1558,6 +1558,19 @@ const EXTRA_STORES_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-
    istnieć w giście — 404 jest traktowane jak pusta lista, nie błąd. */
 const RECIPES_FEED_URL = 'https://gist.githubusercontent.com/dawidberry888-ops/8cf40be3b051301e8ffec03f717dfdec/raw/recipes.json';
 
+/* Prośba Dawida: gdy dodaje nowe przepisy (np. pod nową listę promocji),
+   chce mieć chwilę "na spokojnie" wejść na .../?admin=1 i powykluczać
+   niepasujące produkty, ZANIM zwykli użytkownicy zobaczą te przepisy z
+   ewentualnymi złymi dopasowaniami. Efekt: dla zwykłego widoku appka
+   pokazuje najnowszą wersję z gista dopiero, gdy jest starsza niż ten
+   "bufor" — do tego czasu zostaje przy poprzednio wyświetlanej liście
+   (patrz fetchRecipesFeed). Panel administratora (ADMIN_MODE) ZAWSZE widzi
+   najświeższą wersję natychmiast, bo właśnie z jego poziomu Dawid ma
+   dokonać tych wykluczeń. Każdy kolejny zapis w panelu admina ustawia
+   `updatedAt` na nowo (patrz grosz-do-grosza-admin.html), więc bufor
+   odlicza od czasu OSTATNIEGO zapisu, nie pierwszego. */
+const RECIPES_PUBLISH_DELAY_MS = 30 * 60 * 1000;
+
 /* Kategorie posiłków zgłoszone przez Dawida (punkty 6/7 kolejnego zgłoszenia):
    "Przepisy w appce powinniśmy podzielić na kategorie: Śniadania, Obiad,
    Podwieczorek, Kolacja" + "w panelu administratora powinniśmy mieć
@@ -2630,6 +2643,17 @@ async function fetchRecipesFeed(opts){
     if (res.status === 404) return;
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
+    // Bufor publikacji (patrz RECIPES_PUBLISH_DELAY_MS): zwykły użytkownik
+    // (nie ADMIN_MODE) dostaje świeżo zapisaną wersję dopiero, gdy jest
+    // starsza niż bufor — do tego czasu appka po prostu NIE nadpisuje
+    // state.recipes, więc zostaje przy poprzednio pokazywanej (już
+    // przejrzanej przez Dawida) liście. Wyjątek: jeśli to pierwsze w ogóle
+    // pobranie (state.recipes jeszcze puste), pokazujemy świeże dane od
+    // razu — nie ma nic lepszego, do czego można by "zostać przy starym".
+    const updatedAtMs = json && json.updatedAt ? new Date(json.updatedAt).getTime() : NaN;
+    const ageMs = Number.isFinite(updatedAtMs) ? (Date.now() - updatedAtMs) : Infinity;
+    const tooFreshForRegularUsers = !ADMIN_MODE && ageMs < RECIPES_PUBLISH_DELAY_MS && state.recipes.length > 0;
+    if (tooFreshForRegularUsers) return;
     const rows = Array.isArray(json && json.recipes) ? json.recipes : [];
     state.recipes = rows.map(recipeFromFeedRow).filter(Boolean);
     renderAll();
