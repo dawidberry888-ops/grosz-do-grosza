@@ -875,6 +875,29 @@ nav.tabbar{
 :root[data-layout="kuchnia"] #contactBubbleBtn{bottom:calc(100px + env(safe-area-inset-bottom)); background:var(--ink); color:var(--paper);}
 :root[data-layout="kuchnia"] #contactBubblePanel{bottom:calc(160px + env(safe-area-inset-bottom));}
 
+/* ============ PRZYPOMNIENIA O PŁATNOŚCIACH ============ */
+.bell-btn{
+  background:none; border:none; cursor:pointer; padding:2px 4px; margin-left:6px;
+  font-size:0.9375rem; line-height:1; opacity:.45; flex:none;
+}
+.bell-btn.on{opacity:1;}
+.preset-row .bell-btn{margin-left:2px;}
+.reminder-row{display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px dotted var(--line);}
+.reminder-row:last-child{border-bottom:none;}
+.reminder-row .rname{flex:1; font-size:0.875rem; font-weight:600;}
+.reminder-row .rwhen{font-size:0.75rem; color:var(--ink-soft); font-weight:400; display:block; margin-top:2px;}
+#reminderDialogBackdrop{position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:60;}
+#reminderDialogBackdrop[hidden]{display:none;}
+#reminderDialog{
+  position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(360px, calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow-y:auto;
+  background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:0 12px 40px rgba(0,0,0,.28); padding:18px; z-index:61;
+  display:flex; flex-direction:column; gap:12px;
+}
+#reminderDialog[hidden]{display:none;}
+#reminderDialog h2{font-size:1rem;}
+
 ::selection{background:var(--accent-soft);}
 @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important;} }
 </style>
@@ -939,6 +962,15 @@ nav.tabbar{
          layout, zgłoszenie Dawida: appka była "kwadratowa", a najważniejsza
          liczba chowała się pod kartą wyboru kolorystyki). Karta "Wygląd
          appki" mieszka teraz w zakładce Ustawienia (menu "Więcej"). -->
+    <!-- Nadchodzące/zaległe płatności (patrz dueRemindersToday) — świadomie
+         NAD kwotą "Dziś możesz wydać": to jedyne miejsce, gdzie użytkownik na
+         pewno zajrzy, a przegapiona płatność kosztuje więcej niż przegapiona
+         promocja. Karta pokazuje się tylko wtedy, gdy faktycznie coś nadchodzi. -->
+    <div class="card" id="paymentRemindersCard" hidden style="background:var(--accent-soft); border-color:var(--accent);">
+      <h2 style="margin:0;">Przypomnienie o płatności</h2>
+      <div id="paymentRemindersList"></div>
+    </div>
+
     <div class="hero" id="heroCard">
       <div class="hero-top">
         <div class="eyebrow">Dziś możesz wydać</div>
@@ -1055,21 +1087,23 @@ nav.tabbar{
       </div>
     </div>
 
+    <!-- JEDNA karta na wszystkie koszty stałe (zgłoszenie Dawida: "Jest tego
+         za dużo"). Zamiast 12 gotowych pól i osobnej karty "pozostałe":
+         trzy najczęstsze pozycje jako gotowe wiersze, reszta jako podpowiedź
+         tekstowa w podtytule, a pod spodem to samo dodawanie własnych
+         kosztów, które wcześniej było w drugiej karcie. -->
     <div class="card">
-      <h2>Popularne koszty stałe<span class="sub">Uzupełnij, co Cię dotyczy — resztę zostaw pustą</span></h2>
+      <h2>Koszty stałe<span class="sub">Uzupełnij, co Cię dotyczy — resztę zostaw pustą. Poniżej dopiszesz własne, np. prąd, gaz, woda i ścieki, ubezpieczenie mieszkania, ubezpieczenie samochodu, raty, karnet na siłownię.</span></h2>
       <div id="presetCostsList"></div>
-      <button class="btn btn-primary btn-block" id="savePresetCosts">Zapisz popularne koszty</button>
-    </div>
+      <button class="btn btn-primary btn-block" id="savePresetCosts">Zapisz koszty</button>
 
-    <div class="card">
-      <h2>Koszty stałe - pozostałe<span class="sub">Dopisz własne koszty stałe. Zsumują się one z powyższymi.</span></h2>
-      <div id="fixedCostsList"></div>
-      <div class="total-row"><span>Suma kosztów stałych</span><span class="mono" id="fixedCostsTotal">0,00 zł</span></div>
+      <div id="fixedCostsList" style="margin-top:4px;"></div>
       <div class="row" style="margin-top:4px;">
-        <input id="fcName" placeholder="Inny koszt, np. Czesne">
+        <input id="fcName" placeholder="Inny koszt, np. Prąd">
         <input id="fcAmount" inputmode="decimal" placeholder="Kwota" style="max-width:110px;">
       </div>
       <button class="btn btn-ghost btn-block" id="addFixedCost">+ Dodaj własny koszt</button>
+      <div class="total-row"><span>Suma kosztów stałych</span><span class="mono" id="fixedCostsTotal">0,00 zł</span></div>
     </div>
 
     <div class="card">
@@ -1307,6 +1341,14 @@ nav.tabbar{
       <label class="hint" style="display:flex; align-items:center; gap:6px; margin:2px 0 4px;">
         <input type="checkbox" id="showExpiredToggle" style="width:auto;"> Pokaż też wygasłe promocje
       </label>
+      <!-- Filtr sklepów (zgłoszenie Dawida: "w zakładce Promocje, okno
+           Wszystkie promocje znikła mi możliwość wyboru konkretnego sklepu
+           lub sklepów"). Ta karta grupowała promocje po sklepach, ale nie
+           dawało się zawęzić listy do wybranych — trzeba było przewijać
+           wszystkie grupy. Działa jak filtr w "Co dziś kupisz"
+           (#basketStoreFilter): "Wszystkie" czyści wybór, a poszczególne
+           sklepy można zaznaczać WIELE naraz. -->
+      <div id="productStoreFilter" class="chip-row"></div>
       <div id="productsByStore"></div>
     </div>
 
@@ -1425,6 +1467,34 @@ nav.tabbar{
     <div class="hint" id="contactMessageStatus"></div>
   </div>
 
+  <!-- Okno ustawiania przypomnienia (otwierane dzwonkiem przy koszcie stałym). -->
+  <div id="reminderDialogBackdrop" hidden></div>
+  <div id="reminderDialog" hidden role="dialog" aria-modal="true" aria-labelledby="reminderDialogTitle">
+    <h2 id="reminderDialogTitle">Przypomnienie o płatności</h2>
+    <div class="hint" id="reminderDialogCost"></div>
+    <div class="field">
+      <label for="reminderDateInput">Termin płatności</label>
+      <input type="date" id="reminderDateInput">
+    </div>
+    <div class="field">
+      <label for="reminderRepeatSelect">Powtarzanie</label>
+      <select id="reminderRepeatSelect">
+        <option value="monthly">Co miesiąc tego dnia</option>
+        <option value="once">Tylko raz</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="reminderLeadSelect">Przypomnij</label>
+      <select id="reminderLeadSelect"></select>
+    </div>
+    <div class="hint" id="reminderDialogHint"></div>
+    <div class="row" style="margin-top:4px;">
+      <button type="button" class="btn btn-primary" id="saveReminderBtn">Zapisz</button>
+      <button type="button" class="btn btn-ghost" id="closeReminderBtn">Anuluj</button>
+    </div>
+    <button type="button" class="btn btn-danger-ghost btn-block" id="deleteReminderBtn" hidden>Usuń przypomnienie</button>
+  </div>
+
   <div id="toast"></div>
 </div>
 
@@ -1492,6 +1562,21 @@ const DEFAULT_STATE = {
                         // może pasować gdzie indziej). Klucz to znormalizowana NAZWA (normalizePL), nie id —
                         // id produktów zmienia się przy każdym pobraniu z sieci (patrz fetchRemoteFeed).
   lastImport: null,
+  // Przypomnienia o płatnościach (pomysł Dawida: "obok podanych kwot za jakiś
+  // koszt stały, Użytkownik ma dzwoneczek, który jak kliknie to otwiera mu się
+  // okno z kalendarzem i może wybrać konkretny dzień przypomnienia o
+  // płatności... czy jest to przypomnienie cykliczne czy jednorazowe i jak
+  // szybciej ma mu się pojawić — 1 dzień przed, w dzień płatności, 2 dni
+  // przed... tak jak w kalendarzu Google").
+  // [{ id, costName, date:'YYYY-MM-DD' (termin płatności — przy cyklicznym
+  //    liczy się z niej dzień miesiąca), recurring:true|false,
+  //    leadDays: 0|1|2|3|7, dismissedFor: 'YYYY-MM-DD' (termin, dla którego
+  //    użytkownik kliknął już "OK, wiem" — patrz dueRemindersToday) }]
+  // Model jest CELOWO deklaratywny (dzień + cykliczność + wyprzedzenie), a nie
+  // "lista wyliczonych dat": dzięki temu wersja z App Store/Google Play może
+  // wziąć te same wpisy i zamienić je na prawdziwe powiadomienia systemowe,
+  // bez przerabiania danych użytkownika.
+  paymentReminders: [],
   shoppingList: [], // [{id, qty}, ...] — produkty ręcznie wybrane z "Co dziś kupisz"/"Wszystkie promocje" do własnej listy zakupów,
                      // qty: ile sztuk chce kupić (edytowalne tylko w "Twoja lista zakupów" — wpływa na sumę tam pokazaną,
                      // NIE na dobór produktów w "Co dziś kupisz", to wciąż liczy się po cenie jednostkowej)
@@ -1540,21 +1625,18 @@ const MONTH_NAMES_NOM_PL = ['styczeń','luty','marzec','kwiecień','maj','czerwi
 
 const POLISH_MONTHS = ['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
 
-/* Najczęstsze koszty stałe polskiego gospodarstwa domowego — gotowa lista
-   do szybkiego uzupełnienia; kto nie ma danego kosztu, zostawia pole puste. */
+/* Gotowe wiersze w karcie "Koszty stałe" — TYLKO trzy najczęstsze
+   (zgłoszenie Dawida: dwanaście pól to "za dużo" i przytłaczało zakładkę).
+   Pozostałe typowe koszty są wypisane w podtytule tej karty jako podpowiedź,
+   a użytkownik dopisuje je sobie sam ("+ Dodaj własny koszt") — dzięki temu
+   widzi tylko to, co faktycznie go dotyczy. UWAGA: skrócenie tej listy nie
+   kasuje niczyich danych — koszty zapisane wcześniej pod starymi nazwami
+   (Prąd, Gaz…) siedzą w state.budget.fixedCosts i pokazują się teraz jako
+   własne pozycje na liście poniżej. */
 const PRESET_FIXED_COSTS = [
   'Czynsz / rata za mieszkanie',
-  'Prąd',
-  'Gaz',
-  'Woda i ścieki',
-  'Internet',
-  'Telefon (abonament)',
   'Telewizja / streaming',
-  'Ubezpieczenie mieszkania',
-  'Ubezpieczenie samochodu',
-  'Rata kredytu / pożyczki',
-  'Rata za samochód',
-  'Siłownia / karnet sportowy'
+  'Internet'
 ];
 
 /* Kategorie produktów spożywczych/chemii — używane przy imporcie promocji
@@ -1771,6 +1853,7 @@ let showExpiredPromos = false;
 // nie tylko sklepu/kategorii.
 let promoTypeFilter = '';
 let basketStoreFilter = new Set(); // puste = pokaż koszyk ze wszystkich sklepów
+let productStoreFilter = new Set(); // to samo dla "Wszystkie promocje" (patrz #productStoreFilter) — puste = wszystkie sklepy
 let basketCategoryFilter = new Set(); // puste = pokaż koszyk ze wszystkich kategorii
 let budgetBasketFilter = ''; // szukaj produktu w "Co dziś kupisz"
 
@@ -3878,6 +3961,7 @@ function buildBudgetBasket(products, budget, maxItems){
 
 function renderAll(){
   document.getElementById('todayLabel').textContent = todayLabel();
+  renderPaymentReminders();
   renderHero();
   renderDailySpendInput();
   renderPastSpendList();
@@ -4468,26 +4552,141 @@ function renderNewMonthBanner(){
 /* Gotowa lista popularnych kosztów — każdy wiersz pokazuje kwotę, jeśli
    dany koszt już jest zapisany w fixedCosts (dopasowanie po nazwie),
    w przeciwnym razie zostaje pusty. */
+/* ====================== PRZYPOMNIENIA O PŁATNOŚCIACH ======================
+   Patrz state.paymentReminders. Cała logika sprowadza się do jednego pytania:
+   "jaki jest NAJBLIŻSZY termin płatności tego kosztu (dziś albo później)?" —
+   a potem: "czy do tego terminu zostało już nie więcej niż leadDays dni?".
+   Przy cyklicznym bierzemy dzień miesiąca z zapisanej daty; miesiące krótsze
+   niż ten dzień (np. 31. w lutym) dostają ostatni dzień miesiąca, żeby
+   przypomnienie nigdy nie przepadło. */
+const REMINDER_LEAD_OPTIONS = [
+  { days: 0, label: 'w dniu płatności' },
+  { days: 1, label: '1 dzień wcześniej' },
+  { days: 2, label: '2 dni wcześniej' },
+  { days: 3, label: '3 dni wcześniej' },
+  { days: 7, label: 'tydzień wcześniej' }
+];
+
+function dateKeyFromParts(y, m, d){ // m: 0-11
+  const last = new Date(y, m + 1, 0).getDate();
+  const day = Math.min(d, last); // 31. w miesiącu 30-dniowym -> ostatni dzień
+  return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+}
+
+/* Najbliższy termin płatności dla przypomnienia — nie wcześniejszy niż
+   fromKey (domyślnie dziś). Jednorazowe po terminie zwraca null. */
+function nextReminderDueKey(rem, fromKey){
+  if (!rem || !rem.date) return null;
+  const from = fromKey || todayDateKey();
+  if (!rem.recurring) return rem.date >= from ? rem.date : null;
+  const dayOfMonth = Number(rem.date.slice(8, 10)) || 1;
+  const [fy, fm] = [Number(from.slice(0, 4)), Number(from.slice(5, 7)) - 1];
+  const thisMonth = dateKeyFromParts(fy, fm, dayOfMonth);
+  if (thisMonth >= from) return thisMonth;
+  return dateKeyFromParts(fm === 11 ? fy + 1 : fy, (fm + 1) % 12, dayOfMonth);
+}
+
+function daysBetweenKeys(a, b){
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+}
+
+/* Przypomnienia, które POWINNY się dziś pokazać: termin jest w zasięgu
+   wyprzedzenia (albo już minął, a użytkownik jeszcze nie potwierdził) i nie
+   zostały odklikane dla tego konkretnego terminu. */
+function dueRemindersToday(){
+  const today = todayDateKey();
+  return (state.paymentReminders || []).map(rem => {
+    const due = nextReminderDueKey(rem, today);
+    if (!due) return null;
+    const left = daysBetweenKeys(today, due);
+    if (left > (rem.leadDays || 0)) return null;
+    if (rem.dismissedFor === due) return null;
+    return { rem, due, daysLeft: left };
+  }).filter(Boolean).sort((a, b) => a.due.localeCompare(b.due));
+}
+
+function reminderForCost(costName){
+  return (state.paymentReminders || []).find(r => r.costName === costName) || null;
+}
+
+/* Dzwonek przy koszcie — wypełniony, gdy przypomnienie jest ustawione. */
+function reminderBellHtml(costName){
+  const rem = reminderForCost(costName);
+  const on = !!rem;
+  const title = on
+    ? ('Przypomnienie: ' + reminderSummaryText(rem))
+    : 'Ustaw przypomnienie o płatności';
+  return '<button type="button" class="bell-btn' + (on ? ' on' : '') + '" data-reminder-for="' + escapeHtml(costName) + '"' +
+    ' title="' + escapeHtml(title) + '" aria-label="' + escapeHtml(title) + '">' + (on ? '🔔' : '🔕') + '</button>';
+}
+
+function reminderSummaryText(rem){
+  if (!rem) return '';
+  const lead = REMINDER_LEAD_OPTIONS.find(o => o.days === (rem.leadDays || 0));
+  const when = rem.recurring
+    ? ('co miesiąc ' + Number(rem.date.slice(8, 10)) + '. dnia')
+    : formatDayMonth(rem.date);
+  return when + ', ' + (lead ? lead.label : 'w dniu płatności');
+}
+
+function formatDayMonth(key){
+  const d = Number(key.slice(8, 10)), m = Number(key.slice(5, 7)) - 1;
+  return d + ' ' + POLISH_MONTHS[m];
+}
+
+/* Karta "Przypomnienie o płatności" na górze zakładki Dziś. */
+function renderPaymentReminders(){
+  const card = document.getElementById('paymentRemindersCard');
+  const list = document.getElementById('paymentRemindersList');
+  if (!card || !list) return;
+  const due = dueRemindersToday();
+  card.hidden = !due.length;
+  card.style.display = card.hidden ? 'none' : ''; // .card ma display:flex, samo [hidden] by nie wystarczyło
+  if (!due.length) return;
+  const today = todayDateKey();
+  list.innerHTML = due.map(({ rem, due: dueKey, daysLeft }) => {
+    const cost = state.budget.fixedCosts.find(c => c.name === rem.costName);
+    const kwota = cost ? ' — ' + formatPLN(cost.amount) : '';
+    let when;
+    if (daysLeft < 0) when = 'termin minął ' + Math.abs(daysLeft) + ' ' + (Math.abs(daysLeft) === 1 ? 'dzień' : 'dni') + ' temu (' + formatDayMonth(dueKey) + ')';
+    else if (daysLeft === 0) when = 'termin DZIŚ';
+    else if (daysLeft === 1) when = 'termin jutro (' + formatDayMonth(dueKey) + ')';
+    else when = 'termin za ' + daysLeft + ' dni (' + formatDayMonth(dueKey) + ')';
+    return '<div class="reminder-row">' +
+      '<span class="rname">' + escapeHtml(rem.costName) + escapeHtml(kwota) +
+        '<span class="rwhen">' + escapeHtml(when) + '</span></span>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-dismiss-reminder="' + rem.id + '">OK, wiem</button>' +
+    '</div>';
+  }).join('');
+}
+
 function renderPresetCostsList(){
   const container = document.getElementById('presetCostsList');
   container.innerHTML = PRESET_FIXED_COSTS.map((name, i) => {
     const existing = state.budget.fixedCosts.find(c => c.name === name);
     const val = existing ? existing.amount : '';
     return '<div class="preset-row"><span class="name">' + escapeHtml(name) + '</span>' +
-      '<input type="text" inputmode="decimal" placeholder="—" data-preset-idx="' + i + '" value="' + val + '"></div>';
+      '<input type="text" inputmode="decimal" placeholder="—" data-preset-idx="' + i + '" value="' + val + '">' +
+      reminderBellHtml(name) + '</div>';
   }).join('');
 }
 
 /* Only touches the fixed-costs list/total — never the income or savings
    inputs, so adding/removing a cost never clobbers unsaved typing in
    those fields (they only get set from state on a full renderAll()). */
+/* Lista WŁASNYCH kosztów stałych — czyli tych spoza trzech gotowych wierszy
+   (te mają wyżej własne pola z kwotą, więc pokazywanie ich tu drugi raz
+   byłoby dublowaniem tej samej pozycji w jednej karcie). Suma na dole liczy
+   się z WSZYSTKICH kosztów, gotowych i własnych razem. */
 function renderFixedCostsList(){
   const list = document.getElementById('fixedCostsList');
-  if (!state.budget.fixedCosts.length){
-    list.innerHTML = '<div class="hint">Brak dodanych kosztów stałych.</div>';
+  const own = state.budget.fixedCosts.filter(c => !PRESET_FIXED_COSTS.includes(c.name));
+  if (!own.length){
+    list.innerHTML = '<div class="hint">Nie masz jeszcze własnych kosztów stałych.</div>';
   } else {
-    list.innerHTML = state.budget.fixedCosts.map(c =>
+    list.innerHTML = own.map(c =>
       '<div class="list-row"><span class="name">' + escapeHtml(c.name) + '</span><span class="amount">' + formatPLN(c.amount) +
+      reminderBellHtml(c.name) +
       '<button class="remove" data-remove-fc="' + c.id + '" aria-label="Usuń">✕</button></span></div>'
     ).join('');
   }
@@ -4907,10 +5106,37 @@ function renderProductsPanel(){
   for (const p of filtered){
     (groups[p.store] = groups[p.store] || []).push(p);
   }
-  const storeNames = Object.keys(groups).sort((a,b) => {
+  const allStoreNames = Object.keys(groups).sort((a,b) => {
     const da = storeDistanceKm(a), db = storeDistanceKm(b);
     return (da ?? 1e9) - (db ?? 1e9);
   });
+
+  // Filtr sklepów — chipy budujemy z listy sklepów SPRZED zawężenia, żeby po
+  // wybraniu jednego dało się dołożyć kolejny (tak samo jak w "Co dziś
+  // kupisz"). Przy jednym sklepie w ogóle nie ma czego wybierać, więc rząd
+  // chipów się nie pokazuje.
+  const storeFilterEl = document.getElementById('productStoreFilter');
+  if (storeFilterEl){
+    // Do chipów dokładamy też sklepy AKTUALNIE WYBRANE, nawet jeśli wypadły z
+    // wyników (np. ktoś zaznaczył Biedronkę, a potem wyszukał produkt, który
+    // ma tylko Kaufland). Bez tego rząd chipów by zniknął razem z nimi, a
+    // filtr nadal by działał — użytkownik zostawał z pustą listą i bez
+    // możliwości odznaczenia niewidocznego filtra.
+    const chipStoreNames = Array.from(new Set(allStoreNames.concat([...productStoreFilter])))
+      .sort((a, b) => {
+        const da = storeDistanceKm(a), db = storeDistanceKm(b);
+        return (da ?? 1e9) - (db ?? 1e9);
+      });
+    storeFilterEl.innerHTML = (chipStoreNames.length > 1 || productStoreFilter.size)
+      ? '<button type="button" class="chip' + (productStoreFilter.size === 0 ? ' active' : '') + '" data-product-store-chip="">Wszystkie sklepy</button>' +
+        chipStoreNames.map(name =>
+          '<button type="button" class="chip' + (productStoreFilter.has(name) ? ' active' : '') + '" data-product-store-chip="' + escapeHtml(name) + '">' + escapeHtml(name) + '</button>'
+        ).join('')
+      : '';
+  }
+  const storeNames = productStoreFilter.size
+    ? allStoreNames.filter(s => productStoreFilter.has(s))
+    : allStoreNames;
 
   if (!storeNames.length){
     container.innerHTML = '<div class="empty-state">Brak wyników dla podanych filtrów' + (showExpiredPromos ? '' : ' (spróbuj pokazać też wygasłe promocje)') + '.</div>';
@@ -5208,6 +5434,90 @@ function bindEvents(){
     const box = document.getElementById('productsDisclaimerInfoBox');
     box.hidden = !box.hidden;
     this.setAttribute('aria-expanded', String(!box.hidden));
+  });
+
+  /* ---- Przypomnienia o płatnościach: dzwonek -> okno, zapis, usunięcie ---- */
+  let reminderDialogCostName = null;
+
+  function openReminderDialog(costName){
+    reminderDialogCostName = costName;
+    const rem = reminderForCost(costName);
+    document.getElementById('reminderDialogCost').textContent = costName;
+    const leadSel = document.getElementById('reminderLeadSelect');
+    leadSel.innerHTML = REMINDER_LEAD_OPTIONS.map(o =>
+      '<option value="' + o.days + '"' + ((rem ? rem.leadDays : 1) === o.days ? ' selected' : '') + '>' + o.label + '</option>'
+    ).join('');
+    document.getElementById('reminderDateInput').value = rem ? rem.date : todayDateKey();
+    document.getElementById('reminderRepeatSelect').value = (!rem || rem.recurring) ? 'monthly' : 'once';
+    document.getElementById('reminderDialogHint').textContent = rem
+      ? ('Teraz: ' + reminderSummaryText(rem) + '.')
+      : 'Przypomnienie pojawi się w zakładce Dziś, na górze ekranu.';
+    // Sam atrybut [hidden] tu NIE wystarczy: button.btn ma własne
+    // display:inline-flex, które wygrywa z domyślnym [hidden]{display:none} —
+    // przycisk "Usuń" pokazywał się przy koszcie bez przypomnienia (ta sama
+    // pułapka co przy #newMonthBanner).
+    const delBtn = document.getElementById('deleteReminderBtn');
+    delBtn.hidden = !rem;
+    delBtn.style.display = rem ? '' : 'none';
+    document.getElementById('reminderDialog').hidden = false;
+    document.getElementById('reminderDialogBackdrop').hidden = false;
+  }
+  function closeReminderDialog(){
+    reminderDialogCostName = null;
+    document.getElementById('reminderDialog').hidden = true;
+    document.getElementById('reminderDialogBackdrop').hidden = true;
+  }
+  // Dzwonek jest i przy gotowych wierszach, i przy własnych kosztach — jedna
+  // delegacja na całą zakładkę Budżet obsługuje oba miejsca.
+  document.querySelector('[data-panel="budzet"]').addEventListener('click', (e) => {
+    const bell = e.target.closest('[data-reminder-for]');
+    if (!bell) return;
+    openReminderDialog(bell.getAttribute('data-reminder-for'));
+  });
+  document.getElementById('closeReminderBtn').addEventListener('click', closeReminderDialog);
+  document.getElementById('reminderDialogBackdrop').addEventListener('click', closeReminderDialog);
+  document.getElementById('saveReminderBtn').addEventListener('click', async () => {
+    const costName = reminderDialogCostName;
+    if (!costName) return;
+    const date = document.getElementById('reminderDateInput').value;
+    if (!date) return showToast('Wybierz termin płatności.');
+    const recurring = document.getElementById('reminderRepeatSelect').value === 'monthly';
+    const leadDays = Number(document.getElementById('reminderLeadSelect').value) || 0;
+    state.paymentReminders = state.paymentReminders || [];
+    const existing = state.paymentReminders.find(r => r.costName === costName);
+    if (existing){
+      // Zmiana terminu/wyprzedzenia kasuje wcześniejsze "OK, wiem" — inaczej
+      // świeżo ustawione przypomnienie mogłoby od razu być uznane za odklikane.
+      Object.assign(existing, { date, recurring, leadDays, dismissedFor: null });
+    } else {
+      state.paymentReminders.push({ id: uid(), costName, date, recurring, leadDays, dismissedFor: null });
+    }
+    closeReminderDialog();
+    renderPresetCostsList();
+    renderFixedCostsList();
+    renderPaymentReminders();
+    await persist('Zapisano przypomnienie.');
+  });
+  document.getElementById('deleteReminderBtn').addEventListener('click', async () => {
+    const costName = reminderDialogCostName;
+    if (!costName) return;
+    state.paymentReminders = (state.paymentReminders || []).filter(r => r.costName !== costName);
+    closeReminderDialog();
+    renderPresetCostsList();
+    renderFixedCostsList();
+    renderPaymentReminders();
+    await persist('Usunięto przypomnienie.');
+  });
+  // "OK, wiem" chowa przypomnienie TYLKO dla tego jednego terminu — przy
+  // cyklicznym w kolejnym miesiącu pojawi się znowu.
+  document.getElementById('paymentRemindersList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-dismiss-reminder]');
+    if (!btn) return;
+    const rem = (state.paymentReminders || []).find(r => r.id === btn.getAttribute('data-dismiss-reminder'));
+    if (!rem) return;
+    rem.dismissedFor = nextReminderDueKey(rem, todayDateKey());
+    renderPaymentReminders();
+    await persist();
   });
 
   document.getElementById('addFixedCost').addEventListener('click', () => {
@@ -6057,6 +6367,17 @@ function bindEvents(){
     else basketStoreFilter.add(store);
     basketVisibleCounts = {};
     renderBudgetBasketByStore();
+  });
+
+  // Ten sam mechanizm dla "Wszystkie promocje" (patrz #productStoreFilter).
+  document.getElementById('productStoreFilter').addEventListener('click', (e) => {
+    const store = e.target.getAttribute('data-product-store-chip');
+    if (store === null) return;
+    if (store === '') productStoreFilter.clear();
+    else if (productStoreFilter.has(store)) productStoreFilter.delete(store);
+    else productStoreFilter.add(store);
+    productsVisibleCounts = {};
+    renderProductsPanel();
   });
 
   function closeBasketCategoryPanel(){
