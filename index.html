@@ -1131,13 +1131,17 @@ nav.tabbar{
       <div class="hint">Ta kwota też pomniejsza dzienny budżet — ale zamiast znikać, trafia na saldo bufora w zakładce Cele, z którego możesz korzystać, gdy coś się wydarzy.</div>
     </div>
 
-    <!-- Pokazuje się TYLKO wtedy, gdy w tym miesiącu są dni rozliczone po innej
-         dziennej stawce niż aktualna (patrz staleAllowanceNotice/renderRecalcMonthCard).
-         Zgłoszenie Dawida: po podniesieniu budżetu w trakcie miesiąca dni 1–3
-         zostały przy starej, niższej stawce i "zjadały" dzisiejszą kwotę. -->
-    <div class="card" id="recalcMonthCard" hidden style="background:var(--accent-soft); border-color:var(--accent);">
-      <h2>Budżet zmienił się w trakcie miesiąca<span class="sub" id="recalcMonthHint"></span></h2>
-      <button type="button" class="btn btn-ghost btn-block" id="recalcMonthBtn">Przelicz ten miesiąc według aktualnego budżetu</button>
+    <!-- Przeliczanie całego miesiąca dzieje się teraz samo (patrz
+         dailySpendAllowanceForDate), ale Dawid poprosił, żeby przycisk został:
+         "żeby Użytkownik wiedział, że coś takiego się zadziało w ogóle".
+         Karta mówi więc wprost, jaka zasada obowiązuje, a przycisk pokazuje
+         rozliczenie miesiąca w liczbach — i przy okazji zapisuje aktualną
+         stawkę przy pozycjach, żeby kopia zapasowa zgadzała się z tym, co
+         widać na ekranie. -->
+    <div class="card" id="monthRecalcCard" hidden>
+      <h2>Rozliczenie miesiąca<span class="sub" id="monthRecalcHint"></span></h2>
+      <button type="button" class="btn btn-ghost btn-block" id="monthRecalcBtn">Przelicz cały miesiąc</button>
+      <div class="hint" id="monthRecalcResult" hidden></div>
     </div>
 
     <button class="btn btn-primary btn-block" id="saveBudget">Zapisz budżet</button>
@@ -3696,43 +3700,76 @@ function dailySpendItemsForDate(dateKey){
 function dailySpendTotalForDate(dateKey){
   return dailySpendItemsForDate(dateKey).reduce((sum, e) => sum + e.amount, 0);
 }
-/* "Allowance" (bazowy budżet dnia) zapisujemy przy każdej pozycji, żeby
-   późniejsza zmiana budżetu nie przeliczała wstecz już zapisanych dni.
-   Dla całego dnia bierzemy wartość z jego pierwszej (chronologicznie)
-   pozycji — to ona odzwierciedlała plan na ten dzień w chwili, gdy
-   użytkownik zaczął go zapisywać.
+/* Bazowy budżet dnia.
 
-   WYJĄTEK: dla DZISIAJ appka zawsze liczy tę kwotę na żywo (dokładnie tak
-   samo jak effectiveDailyBudget/hero na "Dziś"), zamiast brać zamrożony
-   zapis sprzed chwili — zgłoszone przez Dawida: dopisanie nowego kosztu
-   stałego w Budżecie od razu zmieniało "Dziś możesz wydać" w hero (98 zł
-   zamiast 100 zł), ale kalendarz i podpowiedź pod "Ile dziś wydałeś?"
-   nadal pokazywały starą kwotę (100 zł), bo czytały zamrożony zapis z
-   PIERWSZEGO dzisiejszego wpisu. Dziś dzień jest wciąż "w toku" — dopóki
-   się nie skończy, każda zmiana budżetu powinna być widoczna wszędzie,
-   spójnie. Gdy dzień minie i przestanie być "dziś", ponownie zacznie
-   korzystać z zamrożonego zapisu (już utrwalonej historii) — zamrażanie
-   dotyczy tylko dni, które faktycznie się skończyły. */
+   BIEŻĄCY MIESIĄC liczy się ZAWSZE po aktualnej stawce — każdy jego dzień,
+   nie tylko dzisiejszy. Wcześniej appka zamrażała stawkę przy pierwszym
+   wpisie danego dnia i już jej nie ruszała; to był błąd, który Dawid zgłosił
+   dwa razy z rzędu. Ostatni raz na własnych danych: 4 września zapisał
+   pierwszy wydatek RANO, jeszcze po starej stawce 116,67 zł/dzień, a
+   koszty stałe poprawił dopiero PÓŹNIEJ tego samego dnia (245,40 zł/dzień).
+   Dopóki 4 września było "dzisiaj", wszystko się zgadzało (dziś liczy się na
+   żywo), ale gdy dzień minął, appka wróciła do zamrożonych 116,67 zł i
+   5 września pokazała 24,89 zł zamiast 153,62 zł — dokładnie 128,73 zł
+   różnicy, czyli 245,40 − 116,67. Przycisk "Przelicz ten miesiąc" nie mógł
+   tego naprawić, bo z założenia pomijał dzień dzisiejszy.
+
+   Zamrażanie ma sens tylko dla miesięcy JUŻ ZAMKNIĘTYCH: tam historia jest
+   utrwalona (medale, tygodniowe wyniki) i zmiana budżetu w listopadzie nie
+   ma prawa przepisywać wrześniowych wyników. Dlatego zapisane `allowance`
+   przy pozycjach zostaje — po prostu czytamy je dopiero dla dni z
+   poprzednich miesięcy.
+
+   Zwraca null tylko wtedy, gdy naprawdę nie wiadomo: dzień z minionego
+   miesiąca, w którym nie ma ani jednego wpisu. */
+function isCurrentMonth(dateKey){
+  return dateKey.slice(0, 7) === todayDateKey().slice(0, 7);
+}
+function baseDailyAllowanceForDate(dateKey){
+  if (isCurrentMonth(dateKey)) return computeBudget().daily;
+  const items = dailySpendItemsForDate(dateKey);
+  return items.length ? items[0].allowance : null;
+}
 function dailySpendAllowanceForDate(dateKey){
   if (dateKey === todayDateKey()){
     return computeBudget().daily + cumulativeAdjustmentBefore(dateKey);
   }
-  const items = dailySpendItemsForDate(dateKey);
-  return items.length ? items[0].allowance : null;
+  return baseDailyAllowanceForDate(dateKey);
 }
 
-/* Suma (budżet dnia − wydane) dla wszystkich zapisanych dni PRZED `dateKey`,
-   w obrębie tego samego miesiąca kalendarzowego co `dateKey` — miesiąc zawsze
-   zaczyna rozliczenie od zera. */
+/* Data pierwszego wpisu W OGÓLE (najstarszego w historii) — potrzebna niżej,
+   żeby nie naliczać budżetu za dni sprzed rozpoczęcia korzystania z appki. */
+function firstEverLoggedDateKey(){
+  let min = null;
+  for (const e of state.dailySpend.log) if (min === null || e.date < min) min = e.date;
+  return min;
+}
+
+/* Suma (budżet dnia − wydane) za wszystkie dni miesiąca PRZED `dateKey`.
+
+   Idziemy dzień po dniu od 1. dnia miesiąca, a NIE po dniach, które mają
+   wpis w dzienniku. To druga połowa tego samego zgłoszenia: wcześniej dzień
+   bez żadnego wpisu był po prostu pomijany, więc zamiast przenieść cały
+   niewydany budżet na kolejny dzień, appka kasowała go bez śladu. Dzień, w
+   którym nic nie kupiłeś, to dzień z wydatkiem 0 zł — cała stawka przechodzi
+   dalej. (Sprawdzenie: te same dane z jawnie wpisanym "0 zł" dawały wynik
+   wyższy o 245,40 zł za każdy taki dzień.)
+
+   Dni sprzed pierwszego wpisu w historii nie liczą się wcale — inaczej ktoś,
+   kto instaluje appkę 20. dnia miesiąca, dostałby na start budżet za 19 dni,
+   których appka w ogóle nie widziała. */
 function cumulativeAdjustmentBefore(dateKey){
   const monthPrefix = dateKey.slice(0, 7);
-  const dates = new Set(
-    state.dailySpend.log
-      .filter(e => e.date.slice(0, 7) === monthPrefix && e.date < dateKey)
-      .map(e => e.date)
-  );
+  const firstEver = firstEverLoggedDateKey();
+  if (firstEver === null) return 0; // pusta historia — nie ma czego przenosić
   let sum = 0;
-  for (const d of dates) sum += (dailySpendAllowanceForDate(d) - dailySpendTotalForDate(d));
+  for (let d = monthPrefix + '-01'; d < dateKey; d = dateKeyAddDays(d, 1)){
+    if (d.slice(0, 7) !== monthPrefix) break;
+    if (d < firstEver) continue;
+    const rate = dailySpendAllowanceForDate(d);
+    if (!Number.isFinite(rate)) continue; // miniony miesiąc bez wpisów — nie wiadomo
+    sum += rate - dailySpendTotalForDate(d);
+  }
   return sum;
 }
 /* Ile REALNIE zostało do wydania w danym dniu: bazowy budżet dnia +
@@ -3753,16 +3790,30 @@ function isoWeekKeyFromDateStr(s){
 
 /* Grupuje dzienne wpisy po tygodniu ISO i zwraca kształt zgodny z dawnym
    ręcznym state.savings.log, żeby reszta logiki (medale, passa, historia,
-   projekcja) mogła zostać bez zmian. */
+   projekcja) mogła zostać bez zmian.
+
+   Bierzemy każdy dzień od pierwszego wpisu w historii do dzisiaj, a nie
+   tylko dni z wpisem — dokładnie z tego samego powodu, co w
+   cumulativeAdjustmentBefore: dzień bez zakupów to dzień z wydatkiem 0 zł i
+   pełną stawką na plus, a nie dzień, którego nie było. Liczymy po stawce
+   BAZOWEJ (baseDailyAllowanceForDate), bo dailySpendAllowanceForDate dla
+   dzisiaj doliczyłaby jeszcze przeniesienie z poprzednich dni miesiąca —
+   a te dni są już w tej sumie osobno. */
 function derivedWeeklySavings(){
   const groups = {};
-  const dates = new Set(state.dailySpend.log.map(e => e.date));
+  const firstEver = firstEverLoggedDateKey();
+  const dates = [];
+  if (firstEver !== null){
+    for (let d = firstEver; d <= todayDateKey(); d = dateKeyAddDays(d, 1)) dates.push(d);
+  }
   for (const d of dates){
+    const rate = baseDailyAllowanceForDate(d);
+    if (!Number.isFinite(rate)) continue; // miniony miesiąc bez wpisów — nie wiadomo
     const wk = isoWeekKeyFromDateStr(d);
     if (!groups[wk]) groups[wk] = { weekLabel: wk, sumDiff: 0, lastTs: 0 };
     const items = dailySpendItemsForDate(d);
-    groups[wk].sumDiff += (dailySpendAllowanceForDate(d) - dailySpendTotalForDate(d));
-    groups[wk].lastTs = Math.max(groups[wk].lastTs, ...items.map(e => e.ts));
+    groups[wk].sumDiff += (rate - dailySpendTotalForDate(d));
+    if (items.length) groups[wk].lastTs = Math.max(groups[wk].lastTs, ...items.map(e => e.ts));
   }
   const target = weeklyTargetRounded();
   return Object.values(groups)
@@ -4243,52 +4294,6 @@ function renderRecipesPanel(){
   }).join('') + loadMoreBtn;
 }
 
-/* ===== Stawki dzienne z dni minionych (gdy budżet zmienił się w miesiącu) =====
-   Dzień, w którym coś już zapisano, zachowuje stawkę z chwili zapisu (patrz
-   dailySpendAllowanceForDate) — celowo, żeby zmiana budżetu nie przepisywała
-   historii wstecz. Ale przez to hero mówiło "Bazowo masz 245,40 zł/dzień", a
-   jednocześnie odejmowało przekroczenie policzone według INNEJ, nieaktualnej
-   stawki — i nie było jak się tego domyślić. Zgłoszenie Dawida: "mam wrażenie,
-   że coś źle mi zlicza (...) Na pewno?" — po sprawdzeniu okazało się, że dni
-   1–3 września były rozliczone po ~124 zł/dzień, a dzisiejszy po 245,40 zł.
-   Liczby były poprawne, brakowało tej jednej informacji. */
-function pastAllowanceRatesThisMonth(todayKey){
-  const monthPrefix = todayKey.slice(0, 7);
-  const dates = [...new Set(state.dailySpend.log
-    .filter(e => e.date.slice(0, 7) === monthPrefix && e.date < todayKey)
-    .map(e => e.date))].sort();
-  const groups = [];
-  for (const d of dates){
-    const rate = dailySpendAllowanceForDate(d);
-    if (!Number.isFinite(rate)) continue;
-    const last = groups[groups.length - 1];
-    // Sąsiadujące dni o tej samej stawce łączymy w jeden zakres ("1–3 września"),
-    // żeby przy kilkunastu dniach nie wypisywać ich pojedynczo.
-    if (last && Math.abs(last.rate - rate) < 0.005) last.to = d;
-    else groups.push({ rate, from: d, to: d });
-  }
-  return groups;
-}
-
-function formatDayRangePL(from, to){
-  if (from === to) return formatDayMonth(from);
-  return Number(from.slice(8, 10)) + '–' + formatDayMonth(to);
-}
-
-/* Zdanie doklejane do podpisu pod kwotą, gdy któryś z minionych dni tego
-   miesiąca był rozliczony po innej stawce niż dzisiejsza. */
-function staleAllowanceNotice(currentDaily){
-  const stale = pastAllowanceRatesThisMonth(todayDateKey())
-    .filter(g => Math.abs(g.rate - currentDaily) >= 0.005);
-  if (!stale.length) return '';
-  const parts = stale.map(g => formatPLN(g.rate) + '/dzień (' + formatDayRangePL(g.from, g.to) + ')');
-  const list = parts.length === 1
-    ? parts[0]
-    : parts.slice(0, -1).join(', ') + ' i ' + parts[parts.length - 1];
-  return ' Uwaga: Twój dzienny budżet zmienił się w trakcie miesiąca — wcześniejsze dni są rozliczone po ' +
-    list + ', bo tyle wtedy wynosił, a dzisiejszy już po ' + formatPLN(currentDaily) + '.';
-}
-
 function renderHero(){
   const hero = document.getElementById('heroCard');
   const amountEl = document.getElementById('heroAmount');
@@ -4337,7 +4342,6 @@ function renderHero(){
   if (spentToday > 0){
     caption += ' Z przydzielonych ' + formatPLN(allotted) + ' na dziś wydałeś/aś już ' + formatPLN(spentToday) + '.';
   }
-  caption += staleAllowanceNotice(calc.daily);
   captionEl.textContent = caption;
 }
 
@@ -4590,43 +4594,41 @@ function renderBudgetPanel(){
   document.getElementById('bufferGoalInput').value = state.budget.bufferGoal || '';
   renderPresetCostsList();
   renderFixedCostsList();
-  renderRecalcMonthCard();
+  renderMonthRecalcCard();
   renderNewMonthBanner();
 }
 
-/* Karta "Budżet zmienił się w trakcie miesiąca" — widoczna tylko wtedy, gdy
-   faktycznie są dni po innej stawce (inaczej byłaby stałym hałasem w
-   zakładce). Sama informacja jest już w podpisie pod kwotą na Dziś; tutaj
-   dochodzi możliwość WYRÓWNANIA miesiąca jednym kliknięciem. */
-function renderRecalcMonthCard(){
-  const card = document.getElementById('recalcMonthCard');
-  const hint = document.getElementById('recalcMonthHint');
+/* Ile dni bieżącego miesiąca appka faktycznie rozlicza: od 1. dnia (albo od
+   pierwszego wpisu w historii, jeśli ktoś zaczął korzystać z appki w trakcie
+   miesiąca) do dzisiaj włącznie. */
+function billedDaysThisMonth(){
+  const todayKey = todayDateKey();
+  const firstEver = firstEverLoggedDateKey();
+  const start = (firstEver !== null && firstEver > todayKey.slice(0, 7) + '-01')
+    ? firstEver : todayKey.slice(0, 7) + '-01';
+  if (start > todayKey) return [];
+  const out = [];
+  for (let d = start; d <= todayKey; d = dateKeyAddDays(d, 1)) out.push(d);
+  return out;
+}
+
+/* Karta "Rozliczenie miesiąca" — czysto informacyjna. Appka przelicza
+   bieżący miesiąc sama przy każdej zmianie budżetu; ta karta istnieje po to,
+   żeby użytkownik w ogóle o tym wiedział, i żeby mógł zobaczyć rozliczenie
+   w liczbach (prośba Dawida po tym, jak sam nie miał jak sprawdzić, skąd
+   appce wyszła kwota). */
+function renderMonthRecalcCard(){
+  const card = document.getElementById('monthRecalcCard');
+  const hint = document.getElementById('monthRecalcHint');
   if (!card || !hint) return;
-  const daily = computeBudget().daily;
-  const stale = pastAllowanceRatesThisMonth(todayDateKey())
-    .filter(g => Math.abs(g.rate - daily) >= 0.005);
-  const show = !!(state.budget.income && stale.length);
+  const show = !!state.budget.income;
   card.hidden = !show;
   card.style.display = show ? '' : 'none'; // .card ma display:flex — samo [hidden] nie wystarczy
   if (!show) return;
-  const days = staleDayKeysThisMonth(daily).length;
-  hint.textContent = days + (days === 1 ? ' dzień w tym miesiącu jest rozliczony' : ' dni w tym miesiącu jest rozliczonych') +
-    ' po innej dziennej kwocie niż obecne ' + formatPLN(daily) +
-    '. Możesz zostawić to tak, jak jest (historia zostaje nienaruszona), albo wyrównać cały miesiąc do dzisiejszej stawki.';
-}
-
-/* Dni bieżącego miesiąca (bez dzisiejszego — ten i tak liczy się na żywo),
-   których zamrożona stawka różni się od aktualnej. */
-function staleDayKeysThisMonth(daily){
-  const todayKey = todayDateKey();
-  const monthPrefix = todayKey.slice(0, 7);
-  return [...new Set(state.dailySpend.log
-    .filter(e => e.date.slice(0, 7) === monthPrefix && e.date < todayKey)
-    .map(e => e.date))]
-    .filter(d => {
-      const rate = dailySpendAllowanceForDate(d);
-      return Number.isFinite(rate) && Math.abs(rate - daily) >= 0.005;
-    });
+  const monthName = MONTH_NAMES_NOM_PL[Number(todayDateKey().slice(5, 7)) - 1];
+  hint.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1) +
+    ' liczy się po ' + formatPLN(computeBudget().daily) + '/dzień — każdy dzień od 1. dnia miesiąca, także ten bez zakupów. ' +
+    'Zmiana budżetu przelicza cały bieżący miesiąc od razu; miesiące już zamknięte zostają bez zmian.';
 }
 
 /* Koszty stałe nie są przypisane do konkretnego miesiąca — zostają zapisane
@@ -5658,21 +5660,30 @@ function bindEvents(){
      zamrożoną kwotę "allowance" przy zapisanych pozycjach — same wydatki
      (kwoty i opisy) zostają nietknięte. Dotyczy tylko bieżącego miesiąca,
      bo rozliczenie i tak zawsze startuje od zera 1. dnia. */
-  document.getElementById('recalcMonthBtn').addEventListener('click', async () => {
+  document.getElementById('monthRecalcBtn').addEventListener('click', async () => {
     const daily = computeBudget().daily;
-    const days = staleDayKeysThisMonth(daily);
-    if (!days.length) return showToast('Nie ma czego wyrównywać — cały miesiąc jest już po aktualnej stawce.');
-    const monthName = MONTH_NAMES_NOM_PL[Number(todayDateKey().slice(5, 7)) - 1];
-    if (!confirm('Wyrównać ' + days.length + ' ' + (days.length === 1 ? 'dzień' : 'dni') + ' (' + monthName +
-      ') do aktualnej stawki ' + formatPLN(daily) + '/dzień?\n\nTwoje zapisane wydatki się NIE zmienią — zmieni się tylko to, ' +
-      'jaki budżet dnia appka do nich przypisuje, a więc i dzisiejsza kwota do wydania.')) return;
+    const days = billedDaysThisMonth();
     const monthPrefix = todayDateKey().slice(0, 7);
-    const dayset = new Set(days);
+    const monthName = MONTH_NAMES_NOM_PL[Number(monthPrefix.slice(5, 7)) - 1];
+    const spent = days.reduce((s, d) => s + dailySpendTotalForDate(d), 0);
+    const pool = days.length * daily;
+    // Zapisujemy aktualną stawkę także PRZY POZYCJACH, żeby eksport danych
+    // pokazywał to samo, co ekran. Na wyliczenia to nie wpływa (bieżący
+    // miesiąc i tak liczy się po aktualnej stawce) — chodzi o spójność kopii.
+    let touched = 0;
     for (const e of state.dailySpend.log){
-      if (e.date.slice(0, 7) === monthPrefix && dayset.has(e.date)) e.allowance = daily;
+      if (e.date.slice(0, 7) === monthPrefix && Math.abs((e.allowance ?? 0) - daily) >= 0.005){ e.allowance = daily; touched++; }
     }
+    const res = document.getElementById('monthRecalcResult');
+    res.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1) + ': ' + days.length +
+      (days.length === 1 ? ' dzień' : (days.length < 5 ? ' dni' : ' dni')) + ' × ' + formatPLN(daily) +
+      ' = ' + formatPLN(pool) + ' budżetu. Wydane: ' + formatPLN(spent) + '. ' +
+      (pool - spent >= 0 ? 'Zostaje: ' : 'Przekroczone o: ') + formatPLN(Math.abs(pool - spent)) + '.';
+    res.hidden = false;
+    res.style.display = '';
     renderAll();
-    await persist('Wyrównano ' + days.length + ' ' + (days.length === 1 ? 'dzień' : 'dni') + ' do ' + formatPLN(daily) + '/dzień.');
+    if (touched) await persist('Przeliczono ' + monthName + ' po ' + formatPLN(daily) + '/dzień.');
+    else showToast('Miesiąc jest już przeliczony po aktualnej stawce.');
   });
 
   document.getElementById('saveBudget').addEventListener('click', async () => {
