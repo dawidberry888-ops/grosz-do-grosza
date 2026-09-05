@@ -174,11 +174,27 @@ a{color:var(--accent);}
 button{font-family:inherit;}
 
 /* ============ HEADER ============ */
+/* Zgłoszenie Dawida (zrzut z iPhone'a): pasek z nazwą appki wchodził pod
+   zegar, wi-fi i baterię. Appka dodana do ekranu głównego działa na iOS w
+   trybie pełnoekranowym z przezroczystym paskiem stanu
+   (apple-mobile-web-app-status-bar-style: black-translucent), więc jej
+   zawartość zaczyna się od samej góry ekranu — pod paskiem systemowym, nie
+   pod nim.
+
+   env(safe-area-inset-top) to wysokość tego paska podana przez system:
+   inna przy notchu, inna przy Dynamic Island, inna na starszym iPhonie z
+   przyciskiem Home, a w zwykłej przeglądarce i na Androidzie równa zeru
+   (stąd wartość zapasowa 0px). Dzięki temu jedna reguła pasuje na każdym
+   telefonie, bez zgadywania modelu. Warunek `viewport-fit=cover` w metatagu
+   viewport jest już ustawiony — bez niego env() zawsze zwracałoby 0.
+
+   Ciemne tło paska nadal sięga samej krawędzi ekranu (to tylko padding),
+   więc wygląd się nie zmienia — schodzi w dół sama treść. */
 .topbar{
   display:flex;
   align-items:baseline;
   justify-content:space-between;
-  padding:20px 20px 8px;
+  padding:calc(20px + env(safe-area-inset-top, 0px)) 20px 8px;
 }
 .topbar .brand{
   font-family:var(--font-display);
@@ -800,7 +816,7 @@ nav.tabbar{
 /* ---- B · KOKPIT ---- */
 :root[data-layout="kokpit"] .topbar{
   background:var(--hero-bg); color:var(--hero-ink);
-  align-items:center; padding:18px 22px 16px; margin-bottom:8px;
+  align-items:center; padding:calc(18px + env(safe-area-inset-top, 0px)) 22px 16px; margin-bottom:8px;
   border-radius:0 0 28px 28px;
 }
 :root[data-layout="kokpit"] .topbar .brand{color:var(--hero-ink); font-weight:800; font-size:1.0625rem;}
@@ -832,7 +848,7 @@ nav.tabbar{
 :root[data-layout="gazetka"] .preport-input, :root[data-layout="gazetka"] .manage-product-row, :root[data-layout="gazetka"] .category-dropdown-panel,
 :root[data-layout="gazetka"] .chart-bar .bar, :root[data-layout="gazetka"] .tab .icon, :root[data-layout="gazetka"] .recipe-card .servings-picker button,
 :root[data-layout="gazetka"] .ingredient-item .ing-amount, :root[data-layout="gazetka"] .medal{border-radius:0;}
-:root[data-layout="gazetka"] .topbar{margin:0 20px; padding:24px 0 12px; border-bottom:1px solid var(--ink);}
+:root[data-layout="gazetka"] .topbar{margin:0 20px; padding:calc(24px + env(safe-area-inset-top, 0px)) 0 12px; border-bottom:1px solid var(--ink);}
 :root[data-layout="gazetka"] .topbar .brand{font-weight:500; font-size:1.375rem;}
 :root[data-layout="gazetka"] .topbar .date{font-weight:700; color:var(--ink-faint);}
 :root[data-layout="gazetka"] .panel{gap:0; padding-top:4px;}
@@ -865,7 +881,7 @@ nav.tabbar{
 
 /* ---- C · CIEPŁA KUCHNIA ---- */
 :root[data-layout="kuchnia"] #app{padding-bottom:110px;}
-:root[data-layout="kuchnia"] .topbar{align-items:center; padding:22px 22px 10px;}
+:root[data-layout="kuchnia"] .topbar{align-items:center; padding:calc(22px + env(safe-area-inset-top, 0px)) 22px 10px;}
 :root[data-layout="kuchnia"] .topbar .brand{font-weight:800; font-size:1.375rem; letter-spacing:-.02em;}
 :root[data-layout="kuchnia"] .topbar .date{text-transform:none; letter-spacing:0; font-weight:600; font-size:0.8125rem;}
 :root[data-layout="kuchnia"] .panel{padding-left:18px; padding-right:18px;}
