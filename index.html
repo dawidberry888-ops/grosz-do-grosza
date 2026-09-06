@@ -377,6 +377,8 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
 .list-row:last-child{border-bottom:none;}
 .list-row .name{font-size:0.875rem;}
 .list-row .amount{font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
+.list-row .amount.good{color:var(--growth);}
+.list-row .amount.warn{color:var(--warn);}
 .list-row .remove{
   background:none; border:none; color:var(--ink-faint); cursor:pointer; font-size:1rem; line-height:1; padding:4px;
 }
@@ -539,9 +541,19 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
 }
 .cal-cell.pad{visibility:hidden; cursor:default; border:none;}
 .cal-cell .cal-daynum{font-size:0.75rem; font-weight:600;}
-.cal-cell .cal-amount{font-size:0.5625rem; font-variant-numeric:tabular-nums;}
+/* Kwota w kratce MUSI być w jednej linii — bez tego "+245,40" łamało się na
+   "+245,4" i "0" pod spodem, co wyglądało jak dwie różne liczby. Kratka jest
+   wąska, więc do tego lekko zmniejszona czcionka i zwężone odstępy. */
+.cal-cell .cal-amount{
+  font-size:0.5rem; font-variant-numeric:tabular-nums;
+  white-space:nowrap; letter-spacing:-.02em; max-width:100%;
+}
 .cal-cell.good .cal-amount{color:var(--growth);}
 .cal-cell.warn .cal-amount{color:var(--warn);}
+/* Dzień policzony jako 0 zł wydane, ale bez żadnego wpisu — kwota jest
+   prawdziwa, tylko wynika z braku zakupów, a nie z zapisanych pozycji.
+   Delikatnie bledsza i pisana kursywą, żeby dało się to odróżnić wzrokiem. */
+.cal-cell.noentry .cal-amount{opacity:.62; font-style:italic;}
 .cal-cell.today{border-color:var(--accent); border-width:2px;}
 .cal-cell.selected{background:var(--accent-soft);}
 
@@ -1082,7 +1094,11 @@ nav.tabbar{
     </div>
 
     <div class="card">
-      <h2>Kalendarz wydatków<span class="sub">Kliknij dzień, żeby zobaczyć rozpisane wydatki</span></h2>
+      <!-- Zgłoszenie Dawida: "czy aby to na pewno kalendarz wydatków? To jest
+           bardziej jakaś suma dzienna z określeniem ile wydaliśmy i ile jesteśmy
+           na plus albo na minus". Miał rację — w kratkach nie ma kwot wydatków,
+           tylko RÓŻNICA między budżetem dnia a tym, co wydano. -->
+      <h2>Bilans dzień po dniu<span class="sub">Ile danego dnia zostało Ci z budżetu — na plus albo na minus. Kliknij dzień, żeby zobaczyć wydatki</span></h2>
       <div class="chip-row" id="calViewModeChips">
         <button type="button" class="chip active" data-cal-view="month">Miesiąc</button>
         <button type="button" class="chip" data-cal-view="week">Tydzień</button>
@@ -1106,7 +1122,18 @@ nav.tabbar{
     </div>
 
     <div class="card">
-      <h2>Oszczędności<span class="sub">Bieżący tydzień</span></h2>
+      <div class="card-head">
+        <h2>Oszczędności<span class="sub">Bieżący tydzień</span></h2>
+        <button type="button" class="info-btn" id="savingsMiniInfoBtn" aria-expanded="false" aria-controls="savingsMiniInfoBox" aria-label="Skąd biorą się te kwoty?">?</button>
+      </div>
+      <!-- Zgłoszenie Dawida: "skąd wzięło się w Odłożone dotychczas 335,98 zł?".
+           Sama liczba nie mówiła, że zawiera w sobie cel tygodniowy — stąd druga
+           linijka z samą nadwyżką i to wyjaśnienie. -->
+      <div class="info-box" id="savingsMiniInfoBox" hidden>
+        <strong>Cel na ten tydzień</strong> to Twój miesięczny cel oszczędności podzielony przez 4,33 (tyle średnio tygodni ma miesiąc). Ta kwota jest już odjęta od budżetu dziennego, więc odkładasz ją samym tym, że mieścisz się w dziennej kwocie.<br><br>
+        <strong>Odłożone w tym tygodniu</strong> to cel plus wszystko, czego w tym tygodniu nie wydałeś/aś ponad plan: dla każdego zapisanego dnia appka liczy budżet dnia minus wydatki i sumuje te różnice. Dzień bez zakupów liczy się jako 0 zł wydane, więc oddaje całą dzienną stawkę na plus.<br><br>
+        <strong>W tym dodatkowo ponad cel</strong> to sama ta nadwyżka — czyli ile udało Ci się odłożyć <em>poza</em> tym, co i tak było zaplanowane. Gdy wyjdzie na minus, znaczy to, że w tym tygodniu przekroczyłeś/aś budżet i część celu została nadszarpnięta.
+      </div>
       <div id="savingsSummaryMini"></div>
     </div>
 
@@ -4636,7 +4663,15 @@ function spendItemRowHtml(item){
 }
 function spendDayListHtml(dateKey){
   const items = dailySpendItemsForDate(dateKey);
-  if (!items.length) return '<div class="hint">Brak zapisanych wydatków tego dnia.</div>';
+  if (!items.length){
+    // Dzień bez wpisów, ale już rozliczony — mówimy wprost, ile z niego
+    // przeszło dalej, żeby kwota z kratki kalendarza miała wyjaśnienie.
+    if (emptyDayCountsAsZeroSpend(dateKey)){
+      return '<div class="hint">Nic nie zapisano tego dnia, więc appka liczy go jako 0 zł wydane — cały budżet dnia (' +
+        formatPLN(baseDailyAllowanceForDate(dateKey)) + ') przeszedł na kolejne dni.</div>';
+    }
+    return '<div class="hint">Brak zapisanych wydatków tego dnia.</div>';
+  }
   return items.map(spendItemRowHtml).join('') +
     '<div class="total-row"><span>Razem</span><span class="mono">' + formatPLN(dailySpendTotalForDate(dateKey)) + '</span></div>';
 }
@@ -4681,13 +4716,33 @@ function mondayOfWeek(dateKey){
   return dateKeyFromDate(d);
 }
 
+/* Czy dzień BEZ ANI JEDNEGO WPISU liczy się już jako "0 zł wydane".
+   Zgłoszenie Dawida: "w dni, kiedy nie ma żadnych wydatków, kalendarz nie
+   pokazuje żadnej kwoty, jest pusto". Wcześniej to było spójne, bo taki dzień
+   faktycznie nie liczył się do niczego. Odkąd rozliczenie idzie dzień po dniu
+   od 1. dnia miesiąca (patrz cumulativeAdjustmentBefore), dzień bez zakupów
+   oddaje całą dzienną stawkę na plus — i kalendarz musi to pokazywać, bo
+   inaczej suma na "Dziś" nie zgadza się z tym, co widać w kratkach.
+
+   Pusto zostaje tam, gdzie naprawdę nie ma czego pokazać:
+   - dni PRZYSZŁE (jeszcze się nie wydarzyły),
+   - dni sprzed pierwszego wpisu w appce (nie wiadomo, co się wtedy działo),
+   - dni z MINIONYCH miesięcy bez wpisów (zamknięta historia, patrz
+     baseDailyAllowanceForDate — appka nie dopisuje ich wstecz). */
+function emptyDayCountsAsZeroSpend(dateKey){
+  if (dateKey > todayDateKey()) return false;
+  if (!isCurrentMonth(dateKey)) return false;
+  const firstEver = firstEverLoggedDateKey();
+  return firstEver !== null && dateKey >= firstEver;
+}
 function calendarCellHtml(dateKey, dayLabel){
   const items = dailySpendItemsForDate(dateKey);
   let cls = 'cal-cell';
   let amountHtml = '';
-  if (items.length){
+  if (items.length || emptyDayCountsAsZeroSpend(dateKey)){
     const diff = dailySpendAllowanceForDate(dateKey) - dailySpendTotalForDate(dateKey);
     cls += diff >= 0 ? ' good' : ' warn';
+    if (!items.length) cls += ' noentry'; // dzień policzony, ale nic w nim nie zapisano
     const sign = diff >= 0 ? '+' : '−';
     amountHtml = '<span class="cal-amount">' + sign + formatPLN(Math.abs(diff)).replace(' zł','') + '</span>';
   }
@@ -4774,7 +4829,14 @@ function renderSavingsSummaryMini(){
   if (entry){
     const ratio = target > 0 ? entry.amount/target : 1;
     const tier = tierForRatio(ratio);
-    body += '<div class="list-row"><span class="name">Odłożone dotychczas</span><span class="amount">' + formatPLN(entry.amount) + (tier ? ' ' + tier.icon : '') + '</span></div>';
+    body += '<div class="list-row"><span class="name">Odłożone w tym tygodniu</span><span class="amount">' + formatPLN(entry.amount) + (tier ? ' ' + tier.icon : '') + '</span></div>';
+    // Druga linijka: sama nadwyżka ponad cel. Dawid pytał "skąd wzięło się
+    // 335,98 zł?" — bo pierwsza kwota zawiera w sobie cel tygodniowy i bez
+    // rozbicia nie da się tego wyczytać. "Dodatkowo" znaczy tu naprawdę
+    // dodatkowo: to, co zostało PONAD plan (na minusie — czego zabrakło).
+    const extra = entry.amount - target;
+    body += '<div class="list-row"><span class="name">W tym dodatkowo ponad cel</span><span class="amount ' +
+      (extra >= 0 ? 'good' : 'warn') + '">' + (extra >= 0 ? '+' : '−') + formatPLN(Math.abs(extra)) + '</span></div>';
   } else {
     body += '<div class="hint">Wpisz dziś, ile wydałeś/aś — appka sama policzy oszczędność.</div>';
   }
@@ -5759,6 +5821,12 @@ function bindEvents(){
     if (!menu.hidden && !menu.contains(e.target) && e.target.id !== 'moreTabBtn' && !document.getElementById('moreTabBtn').contains(e.target)){
       closeMoreTabMenu();
     }
+  });
+
+  document.getElementById('savingsMiniInfoBtn').addEventListener('click', function(){
+    const box = document.getElementById('savingsMiniInfoBox');
+    box.hidden = !box.hidden;
+    this.setAttribute('aria-expanded', String(!box.hidden));
   });
 
   document.getElementById('weeklyGoalInfoBtn').addEventListener('click', function(){
