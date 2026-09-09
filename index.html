@@ -379,6 +379,8 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
 .list-row .amount{font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
 .list-row .amount.good{color:var(--growth);}
 .list-row .amount.warn{color:var(--warn);}
+/* "Do przepisu: ..." przy pozycji listy zakupów — po co ten produkt jest na liście. */
+.list-recipe-note{flex-basis:100%; font-size:0.71875rem; color:var(--ink-soft); margin-top:2px;}
 .list-row .remove{
   background:none; border:none; color:var(--ink-faint); cursor:pointer; font-size:1rem; line-height:1; padding:4px;
 }
@@ -836,6 +838,51 @@ nav.tabbar{
 }
 .back-to-more:active{color:var(--accent);}
 
+
+/* ---- Wiersz kosztu stałego (Budżet) ----
+   Kolejność: nazwa — dzwonek — kwota — ⋮. Dzwonek i menu są rozdzielone
+   kwotą, żeby dwa małe cele dotykowe nie stały obok siebie (zgłoszenie
+   Dawida o myleniu przycisków). */
+.fc-row{
+  position:relative; display:flex; align-items:center; gap:8px;
+  padding:9px 0; border-bottom:1px solid var(--line);
+}
+.fc-row:last-child{border-bottom:none;}
+.fc-row.editing{flex-direction:column; align-items:stretch; gap:6px;}
+.fc-name{flex:1; min-width:0; overflow-wrap:anywhere;}
+.fc-amount{font-family:var(--font-mono); font-variant-numeric:tabular-nums; white-space:nowrap;}
+.fc-row.paid .fc-name, .fc-row.paid .fc-amount{color:var(--ink-faint); text-decoration:line-through;}
+.fc-paid-tag{
+  display:inline-block; font-size:0.625rem; font-weight:700; letter-spacing:.03em;
+  color:var(--growth); background:var(--growth-soft); border:1px solid var(--growth);
+  border-radius:999px; padding:1px 6px; margin-left:4px; text-decoration:none; vertical-align:middle;
+}
+.fc-menu-btn{
+  flex:none; width:32px; height:32px; border-radius:10px; cursor:pointer;
+  border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
+  font-size:1.125rem; line-height:1; font-family:var(--font-body);
+}
+.fc-menu-btn:active{background:var(--paper-raised);}
+.fc-menu{
+  position:absolute; right:0; top:calc(100% - 4px); z-index:30; min-width:200px;
+  background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-sm);
+  box-shadow:0 8px 24px rgba(0,0,0,.16); padding:6px; display:flex; flex-direction:column; gap:2px;
+}
+.fc-menu button{
+  background:none; border:none; cursor:pointer; text-align:left; padding:10px;
+  border-radius:8px; font-family:var(--font-body); font-size:0.875rem; color:var(--ink);
+}
+.fc-menu button:active{background:var(--paper);}
+.fc-menu button.danger{color:var(--warn);}
+
+/* Belka rozdzielająca sekcje w zakładce Budżet. */
+.section-bar{
+  margin:6px 0 -2px; padding:10px 14px; border-radius:var(--radius-sm);
+  background:var(--paper-raised); border:1px solid var(--line);
+  font-size:0.6875rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-soft);
+}
+
 /* Kafelki liczbowe w Statystykach. */
 .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
 .stat-tile{
@@ -1172,10 +1219,10 @@ nav.tabbar{
       <div id="bufferSummaryMini"></div>
     </div>
 
-    <div class="card">
-      <h2>Za tyle dziś kupisz<span class="sub">Najtańsze pozycje z promocji mieszczące się w dziennym budżecie</span></h2>
-      <div id="todayPicks"></div>
-    </div>
+    <!-- Karta "Za tyle dziś kupisz" została usunięta na prośbę Dawida
+         ("okno to nie jest tutaj potrzebne"). Dobieranie produktów pod
+         dzisiejszy budżet zostaje tam, gdzie ma sens: w Promocjach (koszyk
+         wg sklepu) i w Przepisach. -->
   </section>
 
   <!-- ================= BUDŻET ================= -->
@@ -1194,24 +1241,29 @@ nav.tabbar{
       </div>
     </div>
 
-    <!-- JEDNA karta na wszystkie koszty stałe (zgłoszenie Dawida: "Jest tego
-         za dużo"). Zamiast 12 gotowych pól i osobnej karty "pozostałe":
-         trzy najczęstsze pozycje jako gotowe wiersze, reszta jako podpowiedź
-         tekstowa w podtytule, a pod spodem to samo dodawanie własnych
-         kosztów, które wcześniej było w drugiej karcie. -->
+    <!-- Zgłoszenie Dawida (9.09.2026): "rezygnujemy z opcji KOSZTY STAŁE i z
+         tych 3ech proponowanych (...) Użytkownik niech sam wpisuje wszystkie
+         swoje koszty sam. Jedyne, co to dajemy w tekście podpowiedzi".
+         Gotowe wiersze z kwotami zniknęły — zostaje sama lista tego, co
+         użytkownik faktycznie wpisał. Koszty zapisane wcześniej pod nazwami
+         z tamtej listy NIE znikają: siedzą w state.budget.fixedCosts i od
+         teraz pokazują się jako zwykłe pozycje. -->
     <div class="card">
-      <h2>Koszty stałe<span class="sub">Uzupełnij, co Cię dotyczy — resztę zostaw pustą. Poniżej dopiszesz własne, np. prąd, gaz, woda i ścieki, ubezpieczenie mieszkania, ubezpieczenie samochodu, raty, karnet na siłownię.</span></h2>
-      <div id="presetCostsList"></div>
-      <button class="btn btn-primary btn-block" id="savePresetCosts">Zapisz koszty</button>
-
-      <div id="fixedCostsList" style="margin-top:4px;"></div>
+      <h2>Koszty stałe<span class="sub">Wpisz swoje comiesięczne koszty stałe, takie jak: czynsz / rata za mieszkanie, internet, abonament telefoniczny, karnet na siłownię, telewizja / streaming, prąd, gaz, woda i ścieki, ubezpieczenia, raty.</span></h2>
+      <div id="fixedCostsList"></div>
       <div class="row" style="margin-top:4px;">
-        <input id="fcName" placeholder="Inny koszt, np. Prąd">
+        <input id="fcName" placeholder="Nazwa kosztu, np. Czynsz">
         <input id="fcAmount" inputmode="decimal" placeholder="Kwota" style="max-width:110px;">
       </div>
-      <button class="btn btn-ghost btn-block" id="addFixedCost">+ Dodaj własny koszt</button>
+      <button class="btn btn-ghost btn-block" id="addFixedCost">+ Dodaj koszt</button>
       <div class="total-row"><span>Suma kosztów stałych</span><span class="mono" id="fixedCostsTotal">0,00 zł</span></div>
+      <button class="btn btn-primary btn-block" id="saveFixedCosts">Zapisz koszty</button>
     </div>
+
+    <!-- Belka oddzielająca koszty stałe od pozostałych pól budżetu (prośba
+         Dawida: "powinniśmy rozdzielić tę część Kosztów stałych od pozostałych
+         kosztów (...) może dajmy jakąś belkę z opisem"). -->
+    <div class="section-bar">Dodatkowe dane do budżetu</div>
 
     <div class="card">
       <h2>Cel oszczędności<span class="sub">Ile chcesz odkładać miesięcznie</span></h2>
@@ -1429,7 +1481,7 @@ nav.tabbar{
 
     <div class="card">
       <h2>Twoja lista zakupów<span class="sub">Produkty, które sam(a) wybrałeś/aś poniżej</span></h2>
-      <div id="shoppingListBox"></div>
+      <div id="shoppingListBox" class="shopping-list-box"></div>
     </div>
 
     <div class="card">
@@ -1517,6 +1569,15 @@ nav.tabbar{
   </section>
 
   <section class="panel" data-panel="przepisy">
+    <!-- Ta sama lista zakupów co w Promocjach — prośba Dawida: "lista zakupów
+         powinna również znaleźć się na samej górze w zakładce Przepisy".
+         Renderowana z tego samego kodu (patrz renderShoppingList), więc obie
+         kopie są zawsze identyczne. -->
+    <div class="card">
+      <h2>Twoja lista zakupów<span class="sub">To samo, co w zakładce Promocje</span></h2>
+      <div id="shoppingListBoxRecipes" class="shopping-list-box"></div>
+    </div>
+
     <div class="card">
       <h2>Przepisy<span class="sub">Dopasowane do Twoich aktualnych promocji — czego brakuje, dokupisz przy okazji zakupów</span></h2>
       <div id="recipeCategoryFilter" class="chip-row"></div>
@@ -1588,7 +1649,7 @@ nav.tabbar{
     <div class="card">
       <h2>Więcej<span class="sub">Wszystko, czego nie ma w dolnym pasku</span></h2>
       <div class="menu-grid" id="moreMenuGrid">
-        <button type="button" class="menu-tile" data-tab="poduszka"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.4-3.2 7.9-8 9-4.8-1.1-8-4.6-8-9V6z"/></svg></span><span class="tname">Poduszka bezpieczeństwa</span><span class="tsub">Saldo na nagłe wydatki</span></button>
+        <button type="button" class="menu-tile" data-tab="poduszka"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.4-3.2 7.9-8 9-4.8-1.1-8-4.6-8-9V6z"/></svg></span><span class="tname">Poduszka<br>bezpieczeństwa</span><span class="tsub">Saldo na nagłe wydatki</span></button>
         <button type="button" class="menu-tile" data-tab="sklepy"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="tname">Sklepy w okolicy</span><span class="tsub">Odległości i mapa</span></button>
         <button type="button" class="menu-tile" data-tab="przepisy"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M6 19V9a6 6 0 0 1 12 0v10"/><path d="M12 3v2"/></svg></span><span class="tname">Przepisy</span><span class="tsub">Z tego, co jest w promocji</span></button>
         <button type="button" class="menu-tile" data-tab="statystyki"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg></span><span class="tname">Statystyki</span><span class="tsub">Liczby o Twoich wydatkach</span></button>
@@ -1835,20 +1896,6 @@ const MONTH_NAMES_NOM_PL = ['styczeń','luty','marzec','kwiecień','maj','czerwi
 
 const POLISH_MONTHS = ['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
 
-/* Gotowe wiersze w karcie "Koszty stałe" — TYLKO trzy najczęstsze
-   (zgłoszenie Dawida: dwanaście pól to "za dużo" i przytłaczało zakładkę).
-   Pozostałe typowe koszty są wypisane w podtytule tej karty jako podpowiedź,
-   a użytkownik dopisuje je sobie sam ("+ Dodaj własny koszt") — dzięki temu
-   widzi tylko to, co faktycznie go dotyczy. UWAGA: skrócenie tej listy nie
-   kasuje niczyich danych — koszty zapisane wcześniej pod starymi nazwami
-   (Prąd, Gaz…) siedzą w state.budget.fixedCosts i pokazują się teraz jako
-   własne pozycje na liście poniżej. */
-const PRESET_FIXED_COSTS = [
-  'Czynsz / rata za mieszkanie',
-  'Telewizja / streaming',
-  'Internet'
-];
-
 /* Kategorie produktów spożywczych/chemii — używane przy imporcie promocji
    i przy budowaniu koszyka dopasowanego do budżetu (jeden produkt z każdej
    kategorii, żeby koszyk był zróżnicowany, nie samo pieczywo). */
@@ -2084,7 +2131,6 @@ let trophyHistoryVisibleCount = LIST_PAGE_SIZE; // historia miesięcy/kwartałó
 let nearestStoreFilter = new Set(); // puste = pokaż wszystkie sieci w "Najbliższe sklepy"
 let nearestStoresVisibleCount = LIST_PAGE_SIZE; // reset tylko przy zmianie filtra sieci, patrz handler #nearestStoreFilter
 let manageStoresVisibleCount = LIST_PAGE_SIZE; // "Zarządzaj sklepami" nie ma filtra, więc rośnie tylko przy "Wczytaj więcej"
-let todayPicksVisibleCount = LIST_PAGE_SIZE; // "Za tyle dziś kupisz" (Dziś) — bez filtra, więc też rośnie tylko przy "Wczytaj więcej"
 let expandedRecipeIds = new Set(); // które karty przepisów są rozwinięte — czysto lokalne, nieprzetrwałe (patrz renderRecipesPanel)
 // Zgłoszenie Dawida: gdy do składnika (np. "szynka") pasuje kilka różnych
 // promocyjnych produktów naraz, appka pozwala wybrać, o który konkretnie
@@ -3718,9 +3764,14 @@ function findReportById(reportId){
 /* Przycisk "+ Dodaj do listy" / "✓ Na liście" — pozwala wybrać konkretne
    produkty z "Co dziś kupisz" albo "Wszystkie promocje" do własnej,
    osobnej listy zakupów (karta "Twoja lista zakupów" na górze Promocji). */
-function shoppingListToggleHtml(p){
+/* `recipeName` podajemy tylko wtedy, gdy przycisk stoi w karcie przepisu.
+   Zgłoszenie Dawida: "często dodaje się coś do listy zakupów, a potem głowi
+   się, cholera po co ja brałem ten produkt?" — nazwa dania jedzie razem z
+   produktem na listę i widać ją przy pozycji w koszyku. */
+function shoppingListToggleHtml(p, recipeName){
   const inList = state.shoppingList.some(e => e.id === p.id);
-  return '<div class="list-toggle-wrap"><button type="button" class="list-toggle-btn' + (inList ? ' active' : '') + '" data-list-toggle="' + p.id + '">' + (inList ? '✓ Na liście' : '+ Dodaj do listy') + '</button></div>';
+  const recipeAttr = recipeName ? ' data-list-recipe="' + escapeHtml(recipeName) + '"' : '';
+  return '<div class="list-toggle-wrap"><button type="button" class="list-toggle-btn' + (inList ? ' active' : '') + '" data-list-toggle="' + p.id + '"' + recipeAttr + '>' + (inList ? '✓ Na liście' : '+ Dodaj do listy') + '</button></div>';
 }
 
 /* Próg głosów (VOTE_RESOLVE_THRESHOLD) jest teraz pilnowany PO STRONIE BAZY
@@ -4276,7 +4327,6 @@ function renderAll(){
   renderMonthSummary();
   renderSavingsSummaryMini();
   renderBufferSummaryMini();
-  renderTodayPicks();
   renderBudgetPanel();
   renderSavingsPanel();
   renderBufferPanel();
@@ -4307,7 +4357,9 @@ function renderUserCitySetting(){
    (przyciskiem "+ Dodaj do listy" w "Co dziś kupisz"/"Wszystkie promocje"),
    niezależny od tego, co akurat mieści się w dzisiejszym budżecie. */
 function renderShoppingList(){
-  const el = document.getElementById('shoppingListBox');
+  const boxes = [...document.querySelectorAll('.shopping-list-box')];
+  if (!boxes.length) return;
+  const setHtml = html => boxes.forEach(b => { b.innerHTML = html; });
   // Samoczyszczenie: gdyby produkt zniknął z appki (np. po "Zastąp"),
   // jego wpis sam wypadnie z listy zakupów, żeby nie zostawiać duchów.
   const validIds = new Set(state.products.map(p => p.id));
@@ -4315,7 +4367,7 @@ function renderShoppingList(){
 
   const items = state.shoppingList.map(e => ({ entry: e, product: findProductById(e.id) })).filter(x => x.product);
   if (!items.length){
-    el.innerHTML = '<div class="empty-state">Lista jest pusta — dodawaj produkty przyciskiem „+ Dodaj do listy” w sekcjach poniżej.</div>';
+    setHtml('<div class="empty-state">Lista jest pusta — dodawaj produkty przyciskiem „+ Dodaj do listy” przy promocjach i w przepisach.</div>');
     return;
   }
   const todayKey = todayDateKey();
@@ -4324,17 +4376,23 @@ function renderShoppingList(){
   // zapłacić (patrz shoppingListRowCost powyżej — bez tego appka każe
   // zapłacić też za darmowe sztuki, co zgłosił Dawid).
   const total = items.reduce((sum, { entry, product }) => sum + shoppingListRowCost(product, entry.qty), 0);
-  el.innerHTML = items.map(({ entry, product: p }) => {
+  setHtml(items.map(({ entry, product: p }) => {
     const rowTotal = shoppingListRowCost(p, entry.qty);
+    // "Do przepisu: ..." — po to, żeby po tygodniu nie zgadywać, po co ten
+    // produkt w ogóle trafił na listę (zgłoszenie Dawida).
+    const forRecipes = Array.isArray(entry.forRecipes) ? entry.forRecipes.filter(Boolean) : [];
+    const recipeNote = forRecipes.length
+      ? '<div class="list-recipe-note">🍽️ Do przepisu: ' + forRecipes.map(escapeHtml).join(', ') + '</div>'
+      : '';
     return '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + ' / szt.</span>' +
-    promoQtyLineHtml(p) + promoMetaLine(p, todayKey) +
+    recipeNote + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) +
     '<div class="list-toggle-wrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
       '<label class="hint" style="display:flex; align-items:center; gap:6px; margin:0;">Ilość szt.: <input type="number" min="1" step="1" inputmode="numeric" data-qty-id="' + p.id + '" value="' + entry.qty + '" style="width:64px;"></label>' +
       '<span class="mono" style="margin-left:auto;">' + formatPLN(rowTotal) + '</span>' +
       '<button type="button" class="btn btn-danger-ghost btn-sm" data-list-remove="' + p.id + '">Usuń z listy</button>' +
     '</div>' +
     '</div>';
-  }).join('') + '<div class="total-row"><span>Razem</span><span class="mono">' + formatPLN(total) + '</span></div>';
+  }).join('') + '<div class="total-row"><span>Razem</span><span class="mono">' + formatPLN(total) + '</span></div>');
 }
 
 /* "Przepisy" — lista przepisów dodanych przez Dawida (state.recipes, patrz
@@ -4513,7 +4571,7 @@ function renderRecipesPanel(){
             ? '<button type="button" class="excl-btn" data-excl-recipe="' + escapeHtml(r.id) + '" data-excl-ing="' + escapeHtml(ing.name) + '" data-excl-product="' + escapeHtml(p.name) + '" title="Ten konkretny produkt nie pasuje do tego przepisu">✕ nie pasuje</button>'
             : '';
           const productBlock = '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + '</span>' +
-            pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p) + exclBtnHtml + '</div>';
+            pickerHtml + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + shoppingListToggleHtml(p, r.name) + exclBtnHtml + '</div>';
           return '<div class="ingredient-item matched">' + head + productBlock + excludedNoteHtml + publishedExcludedNoteHtml + '</div>';
         }
         return '<div class="ingredient-item missing">' + head + '<div class="missing-ingredient"><span class="buy-tag">🛒 do dokupienia</span></div>' + excludedNoteHtml + publishedExcludedNoteHtml + '</div>';
@@ -4725,6 +4783,8 @@ function renderDailySpendInput(){
    formularzem "Ile dziś wydałeś?" (zawsze dzisiejszy dzień), jak i w
    rozwiniętym dniu kalendarza (dowolna data z przeszłości). */
 let editingSpendItemId = null;
+let editingFixedCostId = null;   // otwarta edycja kosztu stałego (Budżet)
+let fixedCostMenuId = null;      // otwarte menu ⋮ przy koszcie stałym
 function spendItemRowHtml(item){
   if (editingSpendItemId === item.id){
     return '<div class="manage-product-row editing" data-spend-id="' + item.id + '">' +
@@ -4940,50 +5000,10 @@ function renderBufferSummaryMini(){
     '<div class="hint">Nagły wydatek zapisujesz w zakładce Cele — nie obciąża dzisiejszego budżetu.</div>';
 }
 
-function renderTodayPicks(){
-  const el = document.getElementById('todayPicks');
-  const calc = computeBudget();
-  const todayKey = todayDateKey();
-  const todayBudget = effectiveDailyBudget(todayKey);
-  if (!state.products.length){
-    el.innerHTML = '<div class="empty-state">Wklej listę promocji w zakładce <strong>Promocje</strong>, żeby zobaczyć propozycje.</div>';
-    return;
-  }
-  if (!state.budget.income || todayBudget <= 0){
-    el.innerHTML = '<div class="empty-state">Ustaw budżet, żeby appka wiedziała, ile możesz dziś wydać.</div>';
-    return;
-  }
-  const active = state.products.filter(p => isPromoActive(p, todayKey));
-  const sorted = [...active].sort((a,b) => effectivePromoCost(a) - effectivePromoCost(b));
-  let remaining = todayBudget;
-  const picks = [];
-  for (const p of sorted){
-    const cost = effectivePromoCost(p);
-    if (cost <= remaining){ picks.push(p); remaining -= cost; }
-    // Dawniej twardy limit 8 pozycji — teraz zbieramy więcej (do 40), a
-    // widoczność ogranicza sama paginacja "Wczytaj więcej" niżej, żeby "Razem"
-    // u dołu dalej odzwierciedlało WSZYSTKIE pozycje mieszczące się w budżecie,
-    // nie tylko te aktualnie widoczne.
-    if (picks.length >= 40) break;
-  }
-  if (!picks.length){
-    el.innerHTML = '<div class="empty-state">Żaden aktualny produkt z listy nie mieści się w dzisiejszym budżecie (' + formatPLN(todayBudget) + ').</div>';
-    return;
-  }
-  const shown = picks.slice(0, todayPicksVisibleCount);
-  const loadMoreBtn = picks.length > shown.length
-    ? '<button type="button" class="btn btn-ghost btn-sm btn-block" data-loadmore-picks="1">Wczytaj więcej (' + (picks.length - shown.length) + ')</button>'
-    : '';
-  el.innerHTML = shown.map(p =>
-    '<div class="product-row"><span class="pname">' + escapeHtml(p.name) + ' <span class="hint">(' + escapeHtml(p.store) + ')</span></span><span class="pprice">' + formatPLN(p.price) + '</span>' + promoQtyLineHtml(p) + promoMetaLine(p, todayKey) + priceReportBlockHtml(p) + '</div>'
-  ).join('') + loadMoreBtn + '<div class="total-row"><span>Razem</span><span class="mono">' + formatPLN(todayBudget - remaining) + ' / ' + formatPLN(todayBudget) + '</span></div>';
-}
-
 function renderBudgetPanel(){
   document.getElementById('incomeInput').value = state.budget.income || '';
   document.getElementById('savingsGoalInput').value = state.budget.savingsGoal || '';
   document.getElementById('bufferGoalInput').value = state.budget.bufferGoal || '';
-  renderPresetCostsList();
   renderFixedCostsList();
   renderMonthRecalcCard();
   renderNewMonthBanner();
@@ -5016,10 +5036,12 @@ function renderMonthRecalcCard(){
   card.hidden = !show;
   card.style.display = show ? '' : 'none'; // .card ma display:flex — samo [hidden] nie wystarczy
   if (!show) return;
-  const monthName = MONTH_NAMES_NOM_PL[Number(todayDateKey().slice(5, 7)) - 1];
-  hint.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1) +
-    ' liczy się po ' + formatPLN(computeBudget().daily) + '/dzień — każdy dzień od 1. dnia miesiąca, także ten bez zakupów. ' +
-    'Zmiana budżetu przelicza cały bieżący miesiąc od razu; miesiące już zamknięte zostają bez zmian.';
+  // Zgłoszenie Dawida: "musimy lepiej opisać, o co w tym chodzi. Użytkownik
+  // może się zgubić" — stąd opis zaczyna się od tego, KIEDY kliknąć, a
+  // dopiero potem tłumaczy zasadę.
+  hint.textContent = 'Jeśli zmieniłeś/aś cokolwiek w budżecie — dochód, koszty stałe, cel oszczędności — kliknij poniższy przycisk, żeby zobaczyć rozliczenie ' +
+    POLISH_MONTHS[Number(todayDateKey().slice(5, 7)) - 1] + ' po nowej stawce ' + formatPLN(computeBudget().daily) + '/dzień. ' +
+    'Appka i tak przelicza bieżący miesiąc sama, od 1. dnia, licząc też dni bez zakupów — przycisk pokazuje ten rachunek w liczbach. Zamknięte miesiące zostają bez zmian.';
 }
 
 /* Koszty stałe nie są przypisane do konkretnego miesiąca — zostają zapisane
@@ -5152,38 +5174,61 @@ function renderPaymentReminders(){
   }).join('');
 }
 
-function renderPresetCostsList(){
-  const container = document.getElementById('presetCostsList');
-  container.innerHTML = PRESET_FIXED_COSTS.map((name, i) => {
-    const existing = state.budget.fixedCosts.find(c => c.name === name);
-    const val = existing ? existing.amount : '';
-    return '<div class="preset-row"><span class="name">' + escapeHtml(name) + '</span>' +
-      '<input type="text" inputmode="decimal" placeholder="—" data-preset-idx="' + i + '" value="' + val + '">' +
-      reminderBellHtml(name) + '</div>';
-  }).join('');
-}
+/* Rusza tylko listą kosztów i sumą — nigdy polami dochodu/celu/poduszki,
+   żeby dodanie kosztu nie skasowało czegoś, co użytkownik właśnie wpisuje.
 
-/* Only touches the fixed-costs list/total — never the income or savings
-   inputs, so adding/removing a cost never clobbers unsaved typing in
-   those fields (they only get set from state on a full renderAll()). */
-/* Lista WŁASNYCH kosztów stałych — czyli tych spoza trzech gotowych wierszy
-   (te mają wyżej własne pola z kwotą, więc pokazywanie ich tu drugi raz
-   byłoby dublowaniem tej samej pozycji w jednej karcie). Suma na dole liczy
-   się z WSZYSTKICH kosztów, gotowych i własnych razem. */
+   UKŁAD WIERSZA (zgłoszenie Dawida: "często chce się kliknąć jedno, a klika
+   się inne, ponieważ jest to za blisko siebie"): nazwa — dzwonek — kwota —
+   ⋮ menu. Dzwonek przeniesiony NA LEWO od kwoty, a ✕ zastąpione menu z
+   trzema akcjami, żeby dwa małe cele dotykowe nie stały obok siebie.
+
+   OZNACZENIE "ZAPŁACONE" trzymamy jako miesiąc (paidFor: 'YYYY-MM'), nie jako
+   zwykłe true/false — dzięki temu z początkiem nowego miesiąca oznaczenia
+   same znikają i nie trzeba ich ręcznie zerować, a historia poprzedniego
+   miesiąca zostaje w danych. */
+function fixedCostIsPaid(c){
+  return !!c.paidFor && c.paidFor === todayDateKey().slice(0, 7);
+}
 function renderFixedCostsList(){
   const list = document.getElementById('fixedCostsList');
-  const own = state.budget.fixedCosts.filter(c => !PRESET_FIXED_COSTS.includes(c.name));
-  if (!own.length){
-    list.innerHTML = '<div class="hint">Nie masz jeszcze własnych kosztów stałych.</div>';
+  const costs = state.budget.fixedCosts;
+  if (!costs.length){
+    list.innerHTML = '<div class="hint">Nie masz jeszcze żadnych kosztów stałych — dopisz pierwszy poniżej.</div>';
   } else {
-    list.innerHTML = own.map(c =>
-      '<div class="list-row"><span class="name">' + escapeHtml(c.name) + '</span><span class="amount">' + formatPLN(c.amount) +
-      reminderBellHtml(c.name) +
-      '<button class="remove" data-remove-fc="' + c.id + '" aria-label="Usuń">✕</button></span></div>'
-    ).join('');
+    list.innerHTML = costs.map(c => {
+      if (editingFixedCostId === c.id){
+        return '<div class="fc-row editing" data-fc-id="' + c.id + '">' +
+          '<div class="row">' +
+            '<div class="field"><label>Nazwa</label><input type="text" data-fc-field="name" value="' + escapeHtml(c.name) + '"></div>' +
+            '<div class="field"><label>Kwota</label><input type="text" inputmode="decimal" data-fc-field="amount" value="' + formatPLN(c.amount).replace(' zł', '').trim() + '"></div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<button type="button" class="btn btn-primary btn-sm" data-fc-save="' + c.id + '">Zapisz</button>' +
+            '<button type="button" class="btn btn-ghost btn-sm" data-fc-cancel="' + c.id + '">Anuluj</button>' +
+          '</div>' +
+        '</div>';
+      }
+      const paid = fixedCostIsPaid(c);
+      const menuOpen = fixedCostMenuId === c.id;
+      return '<div class="fc-row' + (paid ? ' paid' : '') + '" data-fc-id="' + c.id + '">' +
+        '<span class="fc-name">' + escapeHtml(c.name) + (paid ? ' <span class="fc-paid-tag">✓ zapłacone</span>' : '') + '</span>' +
+        reminderBellHtml(c.name) +
+        '<span class="fc-amount">' + formatPLN(c.amount) + '</span>' +
+        '<button type="button" class="fc-menu-btn" data-fc-menu="' + c.id + '" aria-haspopup="true" aria-expanded="' + menuOpen + '" aria-label="Akcje dla kosztu ' + escapeHtml(c.name) + '">⋮</button>' +
+        (menuOpen
+          ? '<div class="fc-menu">' +
+              '<button type="button" data-fc-edit="' + c.id + '">Edytuj</button>' +
+              '<button type="button" data-fc-paid="' + c.id + '">' + (paid ? 'Cofnij „zapłacone”' : 'Oznacz jako zapłacone') + '</button>' +
+              '<button type="button" class="danger" data-fc-remove="' + c.id + '">Usuń</button>' +
+            '</div>'
+          : '') +
+      '</div>';
+    }).join('');
   }
-  const total = state.budget.fixedCosts.reduce((s,c) => s + c.amount, 0);
-  document.getElementById('fixedCostsTotal').textContent = formatPLN(total);
+  const total = costs.reduce((s, c) => s + c.amount, 0);
+  const paidTotal = costs.filter(fixedCostIsPaid).reduce((s, c) => s + c.amount, 0);
+  document.getElementById('fixedCostsTotal').textContent = formatPLN(total) +
+    (paidTotal > 0 ? ' (zapłacone: ' + formatPLN(paidTotal) + ')' : '');
 }
 
 /* Odświeża wszystko, co zależy od kosztów stałych/budżetu (hero, podsumowanie
@@ -5196,7 +5241,6 @@ function refreshBudgetDependents(){
   renderMonthSummary();
   renderSavingsSummaryMini();
   renderBufferSummaryMini();
-  renderTodayPicks();
 }
 
 // Etykieta + opis dla jednego wpisu historii miesięcznej (tytuł 'mistrz' albo
@@ -6129,8 +6173,7 @@ function bindEvents(){
       state.paymentReminders.push({ id: uid(), costName, date, recurring, leadDays, dismissedFor: null });
     }
     closeReminderDialog();
-    renderPresetCostsList();
-    renderFixedCostsList();
+      renderFixedCostsList();
     renderPaymentReminders();
     await persist('Zapisano przypomnienie.');
   });
@@ -6139,8 +6182,7 @@ function bindEvents(){
     if (!costName) return;
     state.paymentReminders = (state.paymentReminders || []).filter(r => r.costName !== costName);
     closeReminderDialog();
-    renderPresetCostsList();
-    renderFixedCostsList();
+      renderFixedCostsList();
     renderPaymentReminders();
     await persist('Usunięto przypomnienie.');
   });
@@ -6167,29 +6209,90 @@ function bindEvents(){
     refreshBudgetDependents();
   });
 
-  document.getElementById('fixedCostsList').addEventListener('click', (e) => {
-    const id = e.target.getAttribute('data-remove-fc');
-    if (!id) return;
-    state.budget.fixedCosts = state.budget.fixedCosts.filter(c => c.id !== id);
-    refreshBudgetDependents();
+  // Menu ⋮ przy koszcie stałym: Edytuj / Oznacz jako zapłacone / Usuń.
+  // Zastąpiło pojedyncze ✕ stojące tuż obok dzwonka — Dawid: "często chce się
+  // kliknąć jedno, a klika się inne".
+  document.getElementById('fixedCostsList').addEventListener('click', async (e) => {
+    const menuBtn = e.target.closest('[data-fc-menu]');
+    if (menuBtn){
+      const id = menuBtn.getAttribute('data-fc-menu');
+      fixedCostMenuId = (fixedCostMenuId === id) ? null : id;
+      renderFixedCostsList();
+      return;
+    }
+    const editBtn = e.target.closest('[data-fc-edit]');
+    if (editBtn){
+      editingFixedCostId = editBtn.getAttribute('data-fc-edit');
+      fixedCostMenuId = null;
+      renderFixedCostsList();
+      return;
+    }
+    const cancelBtn = e.target.closest('[data-fc-cancel]');
+    if (cancelBtn){
+      editingFixedCostId = null;
+      renderFixedCostsList();
+      return;
+    }
+    const saveBtn = e.target.closest('[data-fc-save]');
+    if (saveBtn){
+      const id = saveBtn.getAttribute('data-fc-save');
+      const row = saveBtn.closest('[data-fc-id]');
+      const name = row.querySelector('[data-fc-field="name"]').value.trim();
+      const amount = parseNum(row.querySelector('[data-fc-field="amount"]').value);
+      if (!name || amount <= 0) return showToast('Podaj nazwę i kwotę większą od zera.');
+      const cost = state.budget.fixedCosts.find(c => c.id === id);
+      if (cost){
+        // Zmiana nazwy musi pociągnąć za sobą przypomnienie — jest przypisane
+        // po nazwie kosztu, więc inaczej dzwonek "zgubiłby" swój koszt.
+        const rem = reminderForCost(cost.name);
+        if (rem && rem.costName !== name) rem.costName = name;
+        cost.name = name;
+        cost.amount = amount;
+      }
+      editingFixedCostId = null;
+      refreshBudgetDependents();
+      await persist('Zapisano zmiany w koszcie stałym.');
+      return;
+    }
+    const paidBtn = e.target.closest('[data-fc-paid]');
+    if (paidBtn){
+      const cost = state.budget.fixedCosts.find(c => c.id === paidBtn.getAttribute('data-fc-paid'));
+      if (cost) cost.paidFor = fixedCostIsPaid(cost) ? null : todayDateKey().slice(0, 7);
+      fixedCostMenuId = null;
+      refreshBudgetDependents();
+      await persist(cost && cost.paidFor ? 'Oznaczono jako zapłacone.' : 'Cofnięto oznaczenie.');
+      return;
+    }
+    const removeBtn = e.target.closest('[data-fc-remove]');
+    if (removeBtn){
+      const id = removeBtn.getAttribute('data-fc-remove');
+      const cost = state.budget.fixedCosts.find(c => c.id === id);
+      if (cost && !confirm('Usunąć koszt „' + cost.name + '” (' + formatPLN(cost.amount) + ')?')) return;
+      state.budget.fixedCosts = state.budget.fixedCosts.filter(c => c.id !== id);
+      fixedCostMenuId = null;
+      refreshBudgetDependents();
+      await persist('Usunięto koszt stały.');
+    }
   });
 
-  document.getElementById('savePresetCosts').addEventListener('click', async () => {
-    document.querySelectorAll('#presetCostsList input[data-preset-idx]').forEach(inp => {
-      const name = PRESET_FIXED_COSTS[Number(inp.getAttribute('data-preset-idx'))];
-      const amount = parseNum(inp.value);
-      const existingIdx = state.budget.fixedCosts.findIndex(c => c.name === name);
-      if (amount > 0){
-        if (existingIdx >= 0) state.budget.fixedCosts[existingIdx].amount = amount;
-        else state.budget.fixedCosts.push({ id: uid(), name, amount });
-      } else if (existingIdx >= 0){
-        state.budget.fixedCosts.splice(existingIdx, 1); // puste pole = koszt nie dotyczy
-      }
-    });
-    renderPresetCostsList();
-    refreshBudgetDependents();
-    await persist('Zapisano popularne koszty.');
+  // Klik gdziekolwiek indziej zamyka otwarte menu ⋮ (ten sam wzorzec co inne
+  // pływające panele w appce).
+  document.addEventListener('click', (e) => {
+    if (fixedCostMenuId === null) return;
+    // PUŁAPKA: listener listy powyżej zdążył już przerysować wiersze, więc
+    // kliknięty węzeł jest w tym momencie ODŁĄCZONY od dokumentu i closest()
+    // nic nie znajdzie — menu zamykałoby się natychmiast po otwarciu. Stąd
+    // sprawdzenie isConnected: odłączony element to nasz własny klik w listę.
+    if (!e.target.isConnected || e.target.closest('#fixedCostsList')) return;
+    fixedCostMenuId = null;
+    renderFixedCostsList();
   });
+
+  document.getElementById('saveFixedCosts').addEventListener('click', async () => {
+    refreshBudgetDependents();
+    await persist('Zapisano koszty stałe.');
+  });
+
 
   /* Wyrównanie miesiąca do aktualnej dziennej stawki. Zmienia WYŁĄCZNIE
      zamrożoną kwotę "allowance" przy zapisanych pozycjach — same wydatki
@@ -7142,16 +7245,10 @@ function bindEvents(){
     renderStoresPanel();
   });
 
-  document.getElementById('todayPicks').addEventListener('click', (e) => {
-    if (e.target.getAttribute('data-loadmore-picks') === null) return;
-    todayPicksVisibleCount += LIST_PAGE_STEP;
-    renderTodayPicks();
-  });
-
   /* Zgłaszanie i ocenianie zgłoszonej ceny — działa identycznie w każdym
-     z trzech miejsc, gdzie pokazywane są produkty (Co dziś kupisz, koszyk
-     wg sklepu, Wszystkie promocje), więc podpinamy tę samą delegację pod
-     wszystkie trzy kontenery. */
+     z miejsc, gdzie pokazywane są produkty (koszyk wg sklepu, Wszystkie
+     promocje, lista zakupów), więc podpinamy tę samą delegację pod każdy
+     z tych kontenerów. */
   function bindPriceReportDelegation(container){
     container.addEventListener('click', async (e) => {
       // Ten sam produkt może być w tej samej chwili wyrenderowany w kilku
@@ -7174,7 +7271,10 @@ function bindEvents(){
           const paidQty = (product && product.promoQty > 1) ? product.promoQty : 1;
           const freeQty = (product && product.freeQty > 0) ? product.freeQty : 0;
           const defaultQty = paidQty + freeQty;
-          state.shoppingList.push({ id: listToggleId, qty: defaultQty });
+          // Skąd ten produkt się wziął — zapisujemy nazwę przepisu, jeśli
+          // przycisk stał w karcie przepisu (patrz shoppingListToggleHtml).
+          const fromRecipe = e.target.getAttribute('data-list-recipe');
+          state.shoppingList.push({ id: listToggleId, qty: defaultQty, forRecipes: fromRecipe ? [fromRecipe] : [] });
         }
         renderAll();
         await persist();
@@ -7230,7 +7330,6 @@ function bindEvents(){
       }
     });
   }
-  bindPriceReportDelegation(document.getElementById('todayPicks'));
   bindPriceReportDelegation(document.getElementById('budgetBasketByStore'));
   bindPriceReportDelegation(document.getElementById('productsByStore'));
   bindPriceReportDelegation(document.getElementById('recipesList')); // pozwala użyć "+ Dodaj do listy" przy dopasowanych składnikach
@@ -7401,19 +7500,19 @@ function bindEvents(){
     renderRecipesPanel();
   });
 
-  document.getElementById('shoppingListBox').addEventListener('click', async (e) => {
+  document.querySelectorAll('.shopping-list-box').forEach(box => box.addEventListener('click', async (e) => {
     const removeId = e.target.getAttribute('data-list-remove');
     if (!removeId) return;
     state.shoppingList = state.shoppingList.filter(entry => entry.id !== removeId);
     renderAll();
     await persist('Usunięto z listy zakupów.');
-  });
+  }));
 
   // Ilość szt. — osobny listener na 'input' (nie 'click'), bo to pole liczbowe.
   // Celowo NIE wołamy tu renderAll() (przerysowałoby cały <input> i zabrałoby
   // fokus/kursor przy każdej wpisanej cyfrze) — tylko dopisujemy sumę wiersza
   // i sumę całkowitą ręcznie, tak samo jak robi to np. edycja budżetu dnia.
-  document.getElementById('shoppingListBox').addEventListener('input', async (e) => {
+  document.querySelectorAll('.shopping-list-box').forEach(box => box.addEventListener('input', async (e) => {
     const qtyId = e.target.getAttribute('data-qty-id');
     if (!qtyId) return;
     const entry = state.shoppingList.find(x => x.id === qtyId);
@@ -7431,11 +7530,12 @@ function bindEvents(){
         const p = findProductById(en.id);
         return sum + (p ? shoppingListRowCost(p, en.qty) : 0);
       }, 0);
-      const totalEl = document.querySelector('#shoppingListBox .total-row .mono');
-      if (totalEl) totalEl.textContent = formatPLN(total);
+      // Obie kopie listy (Promocje i Przepisy) muszą pokazać tę samą sumę.
+      document.querySelectorAll('.shopping-list-box .total-row .mono')
+        .forEach(el => { el.textContent = formatPLN(total); });
     }
     await persist();
-  });
+  }));
 
   document.getElementById('saveUserCity').addEventListener('click', async () => {
     state.profile.city = document.getElementById('userCityInput').value.trim();
