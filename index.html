@@ -386,6 +386,9 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
 }
 
 .total-row{display:flex; justify-content:space-between; padding-top:8px; font-weight:600;}
+/* Druga linia pod sumą (np. "W tym zapłacone") — mniejsza i bledsza, żeby
+   nie konkurowała wzrokiem z sumą właściwą. */
+.sub-total-row{padding-top:2px; font-weight:600; font-size:0.8125rem; color:var(--ink-faint);}
 
 /* preset fixed-cost rows: label + inline amount input */
 .preset-row{
@@ -875,13 +878,32 @@ nav.tabbar{
 .fc-menu button:active{background:var(--paper);}
 .fc-menu button.danger{color:var(--warn);}
 
-/* Belka rozdzielająca sekcje w zakładce Budżet. */
+/* Belka rozdzielająca sekcje w zakładce Budżet. Zgłoszenie Dawida:
+   "powinien być bardziej widoczny. Teraz znowu niknie. Za małe litery itd." —
+   stąd większe pismo, kolor akcentu i gruby pasek z lewej. */
 .section-bar{
-  margin:6px 0 -2px; padding:10px 14px; border-radius:var(--radius-sm);
-  background:var(--paper-raised); border:1px solid var(--line);
-  font-size:0.6875rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--ink-soft);
+  margin:14px 0 2px; padding:14px 16px; border-radius:var(--radius-sm);
+  background:var(--accent-soft); border:1px solid var(--accent); border-left:6px solid var(--accent);
+  font-family:var(--font-display);
+  font-size:0.9375rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--ink);
 }
+
+/* ---- FAQ: lista pytań, odpowiedź rozwijana kliknięciem ---- */
+.faq-item{border-bottom:1px solid var(--line);}
+.faq-item:last-child{border-bottom:none;}
+.faq-q{
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:none; border:none; cursor:pointer; text-align:left; padding:14px 0;
+  font-family:var(--font-body); font-size:0.9375rem; font-weight:700; color:var(--ink);
+}
+.faq-q:active{color:var(--accent);}
+.faq-caret{flex:none; color:var(--ink-faint); transition:transform .15s;}
+.faq-q[aria-expanded="true"] .faq-caret{transform:rotate(180deg);}
+.faq-q[aria-expanded="true"]{color:var(--accent);}
+.faq-a{padding:0 0 14px;}
+.faq-a[hidden]{display:none;}
+.faq-a p{margin:0; font-size:0.875rem; line-height:1.65; color:var(--ink-soft);}
 
 /* Kafelki liczbowe w Statystykach. */
 .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
@@ -894,10 +916,7 @@ nav.tabbar{
 .stat-tile .sv.good{color:var(--growth);}
 .stat-tile .sv.warn{color:var(--warn);}
 
-.faq-item{margin-bottom:16px;}
-.faq-item:last-child{margin-bottom:0;}
-.faq-item h3{font-size:0.9375rem; margin:0 0 4px;}
-.faq-item p{margin:0; font-size:0.84375rem; line-height:1.5; color:var(--ink-soft);}
+/* (Style FAQ przeniesione niżej, do sekcji rozwijanej listy pytań.) */
 
 
 /* ============ LAYOUTY (różnice w kształcie; kolory i kroje — patrz TOKENS) ============ */
@@ -1257,6 +1276,7 @@ nav.tabbar{
       </div>
       <button class="btn btn-ghost btn-block" id="addFixedCost">+ Dodaj koszt</button>
       <div class="total-row"><span>Suma kosztów stałych</span><span class="mono" id="fixedCostsTotal">0,00 zł</span></div>
+      <div class="total-row sub-total-row" id="fixedCostsPaidRow" hidden></div>
       <button class="btn btn-primary btn-block" id="saveFixedCosts">Zapisz koszty</button>
     </div>
 
@@ -1621,20 +1641,38 @@ nav.tabbar{
 
   <!-- Zgłoszenie Dawida: osobna sekcja FAQ, dostępna przez "Więcej" w pasku
        zakładek (patrz nav.tabbar niżej), nie jedna z 6 stałych zakładek. -->
+  <!-- Zgłoszenie Dawida: "w zakładce FAQ powinniśmy mieć tylko listę pytań,
+       i po kliknięciu pytania, powinna rozwijać się odpowiedź". Ściana tekstu
+       zamieniona na spis treści — widać od razu, czy w ogóle jest tu pytanie,
+       które Cię interesuje. -->
   <section class="panel" data-panel="faq">
     <div class="card">
-      <h2>Najczęściej zadawane pytania</h2>
+      <h2>Najczęściej zadawane pytania<span class="sub">Kliknij pytanie, żeby zobaczyć odpowiedź</span></h2>
+      <div id="faqList">
       <div class="faq-item">
-        <h3>Czy w appce znajdują się wszystkie oferty promocyjne z gazetek?</h3>
-        <p>Nie — appka pokazuje wyłącznie to, co zostało ręcznie wpisane z gazetek promocyjnych. Nie ma żadnego automatycznego pobierania ofert ani połączenia z bazami sklepów, więc lista jest zawsze tak pełna, jak zdążono ją uzupełnić. Jeśli brakuje promocji z Twojego sklepu, daj znać przez dymek kontaktowy 💬.</p>
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="0"><span>Czy w appce znajdują się wszystkie oferty promocyjne z gazetek?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA0" hidden><p>Nie — appka pokazuje wyłącznie to, co zostało ręcznie wpisane z gazetek promocyjnych. Nie ma żadnego automatycznego pobierania ofert ani połączenia z bazami sklepów, więc lista jest zawsze tak pełna, jak zdążono ją uzupełnić. Jeśli brakuje promocji z Twojego sklepu, daj znać przez dymek kontaktowy 💬.</p></div>
       </div>
       <div class="faq-item">
-        <h3>Jaki jest cel appki?</h3>
-        <p>Appka ma pomóc świadomie planować codzienne wydatki: pokazuje, ile możesz dziś jeszcze wydać (na podstawie Twojego budżetu), sumuje wydatki dnia i miesiąca, przypomina o aktualnych promocjach w Twoich sklepach i pomaga zbierać na cele oszczędnościowe — bez liczenia tego wszystkiego ręcznie w głowie czy na kartce.</p>
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="1"><span>Jaki jest cel appki?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA1" hidden><p>Appka ma pomóc świadomie planować codzienne wydatki: pokazuje, ile możesz dziś jeszcze wydać (na podstawie Twojego budżetu), sumuje wydatki dnia i miesiąca, przypomina o aktualnych promocjach w Twoich sklepach i pomaga zbierać na cele oszczędnościowe — bez liczenia tego wszystkiego ręcznie w głowie czy na kartce.</p></div>
       </div>
       <div class="faq-item">
-        <h3>Codziennie jestem na minusie! Czy robię coś nie tak?</h3>
-        <p>Niekoniecznie. Pojedyncze dni na minusie są normalne — większe zakupy, wyjście, nieplanowany wydatek — bo appka rozlicza się w skali całego miesiąca, nie pojedynczego dnia: dziś wydasz więcej niż budżet dnia, to jutrzejsza kwota się zmniejszy; wydasz mniej — zwiększy. Dopiero powtarzające się przekraczanie budżetu przez wiele dni z rzędu to sygnał, żeby zajrzeć w zakładkę Budżet i sprawdzić, czy dzienna kwota faktycznie odpowiada Twoim wydatkom — może warto skorygować koszty stałe albo cel oszczędności.</p>
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="2"><span>Codziennie jestem na minusie! Czy robię coś nie tak?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA2" hidden><p>Niekoniecznie. Pojedyncze dni na minusie są normalne — większe zakupy, wyjście, nieplanowany wydatek — bo appka rozlicza się w skali całego miesiąca, nie pojedynczego dnia: dziś wydasz więcej niż budżet dnia, to jutrzejsza kwota się zmniejszy; wydasz mniej — zwiększy. Dopiero powtarzające się przekraczanie budżetu przez wiele dni z rzędu to sygnał, żeby zajrzeć w zakładkę Budżet i sprawdzić, czy dzienna kwota faktycznie odpowiada Twoim wydatkom — może warto skorygować koszty stałe albo cel oszczędności.</p></div>
+      </div>
+      <div class="faq-item">
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="3"><span>Skąd bierze się kwota „Dziś możesz wydać”?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA3" hidden><p>To dzienny budżet (dochód minus koszty stałe, cel oszczędności i poduszka, podzielone przez liczbę dni tego miesiąca) plus wszystko, czego nie wydałeś/aś w poprzednich dniach tego miesiąca, minus dzisiejsze wydatki. Dzień bez zakupów liczy się jako 0 zł wydane, więc cała jego stawka przechodzi dalej.</p></div>
+      </div>
+      <div class="faq-item">
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="4"><span>Po co jest Poduszka bezpieczeństwa i czym różni się od oszczędności?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA4" hidden><p>Poduszka to pieniądze na nagłe, nieplanowane wydatki — leki, awaria, nieplanowany dojazd. Wydatek z poduszki nie obciąża dziennego budżetu, więc jeden pechowy dzień nie psuje całego miesiąca. Cel oszczędności to co innego: to kwota, której świadomie NIE wydajesz, żeby odłożyć ją na bok.</p></div>
+      </div>
+      <div class="faq-item">
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="5"><span>Czy moje dane gdzieś wyciekają?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA5" hidden><p>Nie. Budżet, wydatki, cele i lista zakupów są zapisywane wyłącznie w pamięci przeglądarki na Twoim urządzeniu. Nie wysyłamy ich na żaden serwer. Do internetu appka sięga tylko po listę promocji i przepisy oraz — jeśli zgłosisz inną cenę — po wspólne zgłoszenia cen (bez żadnych danych osobowych).</p></div>
+      </div>
       </div>
     </div>
   </section>
@@ -5227,8 +5265,17 @@ function renderFixedCostsList(){
   }
   const total = costs.reduce((s, c) => s + c.amount, 0);
   const paidTotal = costs.filter(fixedCostIsPaid).reduce((s, c) => s + c.amount, 0);
-  document.getElementById('fixedCostsTotal').textContent = formatPLN(total) +
-    (paidTotal > 0 ? ' (zapłacone: ' + formatPLN(paidTotal) + ')' : '');
+  document.getElementById('fixedCostsTotal').textContent = formatPLN(total);
+  // Zgłoszenie Dawida: rozbicie na zapłacone ma być "w linii niżej", nie
+  // doklejone do sumy — inaczej wiersz robi się długi i trudny do odczytania.
+  const paidEl = document.getElementById('fixedCostsPaidRow');
+  const show = paidTotal > 0;
+  paidEl.hidden = !show;
+  paidEl.style.display = show ? '' : 'none';
+  if (show){
+    paidEl.innerHTML = '<span>W tym zapłacone</span><span class="mono">' + formatPLN(paidTotal) +
+      '</span>';
+  }
 }
 
 /* Odświeża wszystko, co zależy od kosztów stałych/budżetu (hero, podsumowanie
@@ -6084,6 +6131,18 @@ function switchTab(name){
 function bindEvents(){
   document.querySelectorAll('.tab[data-tab]').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
+  // FAQ: pytanie rozwija swoją odpowiedź. Otwarte może być kilka naraz —
+  // przy sześciu pytaniach zamykanie poprzedniego bardziej irytuje, niż pomaga.
+  document.getElementById('faqList').addEventListener('click', (e) => {
+    const q = e.target.closest('.faq-q');
+    if (!q) return;
+    const box = document.getElementById('faqA' + q.getAttribute('data-faq'));
+    if (!box) return;
+    const open = box.hidden;
+    box.hidden = !open;
+    q.setAttribute('aria-expanded', String(open));
+  });
+
   document.getElementById('moreMenuGrid').addEventListener('click', (e) => {
     const tile = e.target.closest('[data-tab]');
     if (!tile) return;
@@ -6290,7 +6349,7 @@ function bindEvents(){
 
   document.getElementById('saveFixedCosts').addEventListener('click', async () => {
     refreshBudgetDependents();
-    await persist('Zapisano koszty stałe.');
+    await persist('Koszty stałe zapisane. Dzienny budżet przeliczony.');
   });
 
 
@@ -6320,8 +6379,11 @@ function bindEvents(){
     res.hidden = false;
     res.style.display = '';
     renderAll();
-    if (touched) await persist('Przeliczono ' + monthName + ' po ' + formatPLN(daily) + '/dzień.');
-    else showToast('Miesiąc jest już przeliczony po aktualnej stawce.');
+    // Zgłoszenie Dawida: po kliknięciu ma się pojawić chmurka z potwierdzeniem,
+    // żeby było widać, że coś się w ogóle wydarzyło.
+    const msg = 'Dzienny budżet przeliczony — ' + formatPLN(daily) + '/dzień.';
+    if (touched) await persist(msg);
+    else showToast(msg);
   });
 
   document.getElementById('saveBudget').addEventListener('click', async () => {
