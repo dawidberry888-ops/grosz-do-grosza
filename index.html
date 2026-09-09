@@ -1407,11 +1407,34 @@ nav.tabbar{
       <div class="field">
         <input id="bufferNote" placeholder="Notatka (np. leki na przeziębienie)">
       </div>
+      <!-- Pytanie Dawida: "o co tak do końca chodzi z opcją Zasil poduszkę?".
+           Kluczowe jest to, SKĄD biorą się te pieniądze — bo jeśli z bieżącego
+           budżetu na wydatki, to dzienna kwota musi spaść; jeśli z premii czy
+           oszczędności, nie ma prawa się zmienić. Dlatego pytamy wprost. -->
+      <div class="field" id="bufferSourceField">
+        <label for="bufferTopupSource">Skąd pieniądze na zasilenie?</label>
+        <select id="bufferTopupSource">
+          <option value="outside">Spoza budżetu (premia, zwrot, oszczędności) — dzienny budżet bez zmian</option>
+          <option value="budget">Z bieżącego budżetu na wydatki — obniży dzienną kwotę</option>
+        </select>
+      </div>
       <div class="row">
         <button class="btn btn-ghost" id="bufferTopup">+ Zasil poduszkę</button>
         <button class="btn btn-danger-ghost" id="bufferExpense">− Wydatek z poduszki</button>
       </div>
       <div class="hint">Nagły wydatek (leki, awaria, nieplanowany dojazd) zapisujesz tutaj — zejdzie z salda poduszki, a nie z dzisiejszego budżetu.</div>
+      <!-- Komunikat pokazywany dopiero przy pustej poduszce (propozycja Dawida). -->
+      <div class="hint" id="bufferEmptyNotice" hidden style="background:var(--accent-soft); border-radius:var(--radius-sm); padding:10px 12px;"></div>
+    </div>
+
+    <!-- Odpowiednik karty "Rozliczenie miesiąca" z Budżetu, ale liczy tylko dni
+         OD DNIA ZASILENIA do końca miesiąca — prośba Dawida: "po dodaniu
+         dodatkowego budżetu do Poduszki nie powinno przeliczać na nowo
+         wszystkiego, tylko od dnia zasilenia". -->
+    <div class="card" id="bufferRecalcCard" hidden>
+      <h2>Rozliczenie pozostałych dni<span class="sub" id="bufferRecalcHint"></span></h2>
+      <button type="button" class="btn btn-ghost btn-block" id="bufferRecalcBtn">Przelicz pozostały miesiąc</button>
+      <div class="hint" id="bufferRecalcResult" hidden></div>
     </div>
 
     <div class="card">
@@ -1860,6 +1883,14 @@ const DEFAULT_STATE = {
                         // składnika w tym przepisie, i appka nigdy więcej go tam nie zaproponuje (ale nadal
                         // może pasować gdzie indziej). Klucz to znormalizowana NAZWA (normalizePL), nie id —
                         // id produktów zmienia się przy każdym pobraniu z sieci (patrz fetchRemoteFeed).
+  budgetAdjustments: [], // [{ id, fromDate:'YYYY-MM-DD', amount, note, ts }]
+                        // Zasilenia Poduszki bezpieczeństwa opłacone Z BIEŻĄCEGO budżetu na wydatki.
+                        // Pytanie Dawida: "jeśli ktoś zasila o dodatkowy budżet Poduszkę (...) nie
+                        // powinno przeliczać na nowo wszystkiego, tylko od dnia zasilenia". Dlatego
+                        // kwota nie jest odejmowana jednorazowo, tylko ROZKŁADANA RÓWNO na dni od
+                        // `fromDate` do końca tego miesiąca — dni już minione zostają nietknięte.
+                        // Zasilenia z pieniędzy SPOZA budżetu (premia, zwrot, oszczędności) nic tu
+                        // nie dopisują, bo nie mają prawa obniżać dziennej kwoty.
   globalRecipeExclusions: [], // znormalizowane NAZWY produktów, które nie mają czego szukać w ŻADNYM przepisie
                         // (karma dla psów, płyn do prania, ręczniki papierowe). Zgłoszenie Dawida przy pracy
                         // nad ekranem Kurator: wykluczanie takiego produktu osobno w każdym przepisie to
@@ -4054,14 +4085,36 @@ function dailySpendTotalForDate(dateKey){
 function isCurrentMonth(dateKey){
   return dateKey.slice(0, 7) === todayDateKey().slice(0, 7);
 }
+/* Ile z dziennej stawki zabiera danego dnia zasilenie poduszki opłacone z
+   bieżącego budżetu. Kwota rozkłada się RÓWNO na dni od dnia zasilenia do
+   końca miesiąca, więc: 500 zł przy 20 dniach do końca = 25 zł mniej dziennie.
+   Dni sprzed zasilenia nie są ruszane. */
+function budgetAdjustmentForDate(dateKey){
+  const list = state.budgetAdjustments;
+  if (!Array.isArray(list) || !list.length) return 0;
+  let sum = 0;
+  for (const a of list){
+    if (!a || !a.fromDate || !(a.amount > 0)) continue;
+    if (a.fromDate.slice(0, 7) !== dateKey.slice(0, 7)) continue; // zasilenie dotyczy tylko swojego miesiąca
+    if (dateKey < a.fromDate) continue;
+    const [y, m] = a.fromDate.split('-').map(Number);
+    const daysLeft = daysInMonth(y, m - 1) - Number(a.fromDate.slice(8, 10)) + 1;
+    if (daysLeft > 0) sum += a.amount / daysLeft;
+  }
+  return sum;
+}
+/* Bazowa stawka dnia PO uwzględnieniu zasileń poduszki z bieżącego budżetu. */
+function baseDailyRate(dateKey){
+  return computeBudget().daily - budgetAdjustmentForDate(dateKey);
+}
 function baseDailyAllowanceForDate(dateKey){
-  if (isCurrentMonth(dateKey)) return computeBudget().daily;
+  if (isCurrentMonth(dateKey)) return baseDailyRate(dateKey);
   const items = dailySpendItemsForDate(dateKey);
   return items.length ? items[0].allowance : null;
 }
 function dailySpendAllowanceForDate(dateKey){
   if (dateKey === todayDateKey()){
-    return computeBudget().daily + cumulativeAdjustmentBefore(dateKey);
+    return baseDailyRate(dateKey) + cumulativeAdjustmentBefore(dateKey);
   }
   return baseDailyAllowanceForDate(dateKey);
 }
@@ -4109,7 +4162,7 @@ function cumulativeAdjustmentBefore(dateKey){
    przez tę jedną funkcję — więc zapisanie wydatku w "Ile dziś wydałeś?"
    od razu obniża kwotę wszędzie indziej, spójnie. */
 function effectiveDailyBudget(dateKey){
-  const allotted = computeBudget().daily + cumulativeAdjustmentBefore(dateKey);
+  const allotted = baseDailyRate(dateKey) + cumulativeAdjustmentBefore(dateKey);
   return allotted - dailySpendTotalForDate(dateKey);
 }
 function isoWeekKeyFromDateStr(s){
@@ -4772,7 +4825,10 @@ function renderHero(){
     progressEl.hidden = false;
   }
   const adjustment = cumulativeAdjustmentBefore(todayDateKey());
-  const allotted = calc.daily + adjustment; // ile budżetu przydzielono na dziś (po korekcie z poprzednich dni)
+  // baseDailyRate, a nie calc.daily — uwzględnia zasilenia poduszki opłacone
+  // z bieżącego budżetu, rozłożone na pozostałe dni miesiąca.
+  const baseToday = baseDailyRate(todayDateKey());
+  const allotted = baseToday + adjustment; // ile budżetu przydzielono na dziś (po korekcie z poprzednich dni)
   const spentToday = dailySpendTotalForDate(todayDateKey());
   const effective = effectiveDailyBudget(todayDateKey()); // ile REALNIE zostało do wydania dzisiaj (= allotted - spentToday)
   const whole = Math.floor(Math.abs(effective));
@@ -4781,15 +4837,24 @@ function renderHero(){
   amountEl.innerHTML = sign + whole + ',' + String(cents).padStart(2,'0') + ' <span class="zl">zł</span>';
   hero.classList.toggle('warn', effective < 0);
   let caption;
-  if (calc.daily < 0){
+  if (baseToday < 0){
     caption = 'Przy obecnych kosztach stałych, celu oszczędności i buforze wydajesz więcej niż zarabiasz.';
   } else if (Math.abs(adjustment) < 0.005){
     const setAside = b.savingsGoal + (b.bufferGoal||0);
     caption = 'Tyle dziennie zostaje Ci na wydatki w ' + calc.dim + '-dniowym miesiącu, po odłożeniu ' + formatPLN(setAside) + ' na oszczędności i bufor.';
   } else if (adjustment > 0){
-    caption = 'Bazowo masz ' + formatPLN(calc.daily) + '/dzień. Dziś masz więcej, bo w poprzednich dniach tego miesiąca zaoszczędziłeś/aś łącznie ' + formatPLN(adjustment) + '.';
+    caption = 'Bazowo masz ' + formatPLN(baseToday) + '/dzień. Dziś masz więcej, bo w poprzednich dniach tego miesiąca zaoszczędziłeś/aś łącznie ' + formatPLN(adjustment) + '.';
   } else {
-    caption = 'Bazowo masz ' + formatPLN(calc.daily) + '/dzień. Dziś masz mniej, bo w poprzednich dniach tego miesiąca przekroczyłeś/aś budżet łącznie o ' + formatPLN(-adjustment) + '.';
+    caption = 'Bazowo masz ' + formatPLN(baseToday) + '/dzień. Dziś masz mniej, bo w poprzednich dniach tego miesiąca przekroczyłeś/aś budżet łącznie o ' + formatPLN(-adjustment) + '.';
+  }
+  // Zasilenie poduszki z bieżącego budżetu obniża dzienną kwotę — i musi to
+  // być powiedziane wprost, inaczej użytkownik zobaczy niższą liczbę i nie
+  // będzie wiedział dlaczego (dokładnie ten błąd popełniliśmy już raz przy
+  // zamrożonych stawkach).
+  const topupCut = budgetAdjustmentForDate(todayDateKey());
+  if (topupCut >= 0.005){
+    caption += ' Bazowa stawka to ' + formatPLN(baseToday) + '/dzień — o ' + formatPLN(topupCut) +
+      ' mniej, bo zasilenie poduszki z bieżącego budżetu rozkłada się na pozostałe dni miesiąca.';
   }
   if (spentToday > 0){
     caption += ' Z przydzielonych ' + formatPLN(allotted) + ' na dziś wydałeś/aś już ' + formatPLN(spentToday) + '.';
@@ -5078,7 +5143,7 @@ function renderMonthRecalcCard(){
   // może się zgubić" — stąd opis zaczyna się od tego, KIEDY kliknąć, a
   // dopiero potem tłumaczy zasadę.
   hint.textContent = 'Jeśli zmieniłeś/aś cokolwiek w budżecie — dochód, koszty stałe, cel oszczędności — kliknij poniższy przycisk, żeby zobaczyć rozliczenie ' +
-    POLISH_MONTHS[Number(todayDateKey().slice(5, 7)) - 1] + ' po nowej stawce ' + formatPLN(computeBudget().daily) + '/dzień. ' +
+    POLISH_MONTHS[Number(todayDateKey().slice(5, 7)) - 1] + ' po nowej stawce ' + formatPLN(baseDailyRate(todayDateKey())) + '/dzień. ' +
     'Appka i tak przelicza bieżący miesiąc sama, od 1. dnia, licząc też dni bez zakupów — przycisk pokazuje ten rachunek w liczbach. Zamknięte miesiące zostają bez zmian.';
 }
 
@@ -5455,7 +5520,7 @@ function renderStatsPanel(){
     return;
   }
 
-  const daily = computeBudget().daily;
+  const daily = baseDailyRate(todayDateKey());
   const spentByDay = days.map(d => ({ date: d, spent: dailySpendTotalForDate(d), items: dailySpendItemsForDate(d).length }));
   const totalSpent = spentByDay.reduce((s, d) => s + d.spent, 0);
   const avgPerDay = totalSpent / days.length;
@@ -5561,11 +5626,61 @@ function renderStatsPanel(){
   document.getElementById('statsRecords').innerHTML = recs.join('');
 }
 
+/* Zasilenia poduszki opłacone z bieżącego budżetu, które dotyczą TEGO
+   miesiąca — to one obniżają dzienną stawkę od dnia zasilenia. */
+function budgetAdjustmentsThisMonth(){
+  const monthPrefix = todayDateKey().slice(0, 7);
+  return (state.budgetAdjustments || []).filter(a => a && a.fromDate && a.fromDate.slice(0, 7) === monthPrefix && a.amount > 0);
+}
+/* Dni od pierwszego takiego zasilenia do końca miesiąca — czyli te, których
+   dotyczy "Przelicz pozostały miesiąc". */
+function remainingDaysFromAdjustments(){
+  const list = budgetAdjustmentsThisMonth();
+  if (!list.length) return [];
+  const from = list.map(a => a.fromDate).sort()[0];
+  const [y, m] = from.split('-').map(Number);
+  const dim = daysInMonth(y, m - 1);
+  const out = [];
+  for (let d = from; Number(d.slice(8, 10)) <= dim && d.slice(0, 7) === from.slice(0, 7); d = dateKeyAddDays(d, 1)) out.push(d);
+  return out;
+}
+function renderBufferRecalcCard(){
+  const card = document.getElementById('bufferRecalcCard');
+  const hint = document.getElementById('bufferRecalcHint');
+  if (!card || !hint) return;
+  const list = budgetAdjustmentsThisMonth();
+  const show = list.length > 0;
+  card.hidden = !show;
+  card.style.display = show ? '' : 'none'; // .card ma display:flex — samo [hidden] nie wystarczy
+  if (!show) return;
+  const total = list.reduce((s, a) => s + a.amount, 0);
+  const from = list.map(a => a.fromDate).sort()[0];
+  const days = remainingDaysFromAdjustments().length;
+  hint.textContent = 'Zasiliłeś/aś poduszkę z bieżącego budżetu kwotą ' + formatPLN(total) +
+    ' (od ' + formatDayMonth(from) + '). Ta kwota rozkłada się równo na ' + days +
+    (days === 1 ? ' dzień' : ' dni') + ' do końca miesiąca — dni wcześniejsze zostają nietknięte.';
+}
+
 function renderBufferPanel(){
   document.getElementById('bufferGoalSub').textContent = state.budget.bufferGoal
     ? ('Miesięczna wpłata: ' + formatPLN(state.budget.bufferGoal))
     : 'Ustaw miesięczną wpłatę w zakładce Budżet';
   document.getElementById('bufferBalanceAmount').innerHTML = formatPLN(bufferBalance()).replace(' zł', '') + ' <span class="zl">zł</span>';
+
+  // Komunikat przy wyczerpanej poduszce — treść wprost z propozycji Dawida.
+  // Oba przyciski zostają widoczne (ukrywanie "Zasil" przy dodatnim saldzie
+  // uniemożliwiałoby uzupełnienie poduszki zawczasu i poprawienie pomyłki).
+  const emptyNotice = document.getElementById('bufferEmptyNotice');
+  const empty = bufferBalance() <= 0;
+  emptyNotice.hidden = !empty;
+  emptyNotice.style.display = empty ? '' : 'none';
+  if (empty){
+    emptyNotice.textContent = 'Saldo Twojej poduszki jest wykorzystane. Możesz zasilić ją dodatkową kwotą — ' +
+      'jeśli wskażesz, że pochodzi z bieżącego budżetu, dzienna kwota do wydania zostanie ustalona na nowo, ' +
+      'ale tylko od dnia zasilenia. Możesz też zostawić saldo takie, jakie jest, a kolejne koszty wpisywać ' +
+      'w codziennych wydatkach.';
+  }
+  renderBufferRecalcCard();
 
   const hist = document.getElementById('bufferHistory');
   const log = [...state.buffer.log].sort((a,b) => b.ts - a.ts);
@@ -6527,6 +6642,12 @@ function bindEvents(){
     await persist();
   });
 
+  /* Ile dni zostało do końca miesiąca, licząc z dniem zasilenia. */
+  function remainingDaysAfterTopup(fromDate){
+    const [y, m] = fromDate.split('-').map(Number);
+    return Math.max(1, daysInMonth(y, m - 1) - Number(fromDate.slice(8, 10)) + 1);
+  }
+
   function addBufferEntry(type){
     const amtEl = document.getElementById('bufferAmount');
     const noteEl = document.getElementById('bufferNote');
@@ -6535,11 +6656,48 @@ function bindEvents(){
     if (type === 'expense' && amount > bufferBalance()){
       if (!confirm('Ta kwota przekracza saldo bufora (' + formatPLN(bufferBalance()) + '). Zapisać mimo to?')) return;
     }
-    state.buffer.log.push({ id: uid(), type, amount, note: noteEl.value.trim(), ts: Date.now() });
+    const entry = { id: uid(), type, amount, note: noteEl.value.trim(), ts: Date.now() };
+    let toast = 'Zapisano wydatek z poduszki.';
+    if (type === 'topup'){
+      const fromBudget = document.getElementById('bufferTopupSource').value === 'budget';
+      toast = 'Poduszka zasilona o ' + formatPLN(amount) + '.';
+      if (fromBudget){
+        // Pieniądze pochodzą z bieżącego budżetu, więc muszą go pomniejszyć —
+        // ale dopiero od DZIŚ, rozłożone równo na pozostałe dni miesiąca
+        // (patrz budgetAdjustmentForDate).
+        const fromDate = todayDateKey();
+        const adjId = uid();
+        state.budgetAdjustments = state.budgetAdjustments || [];
+        state.budgetAdjustments.push({ id: adjId, fromDate, amount, note: entry.note, ts: Date.now() });
+        entry.adjustmentId = adjId; // usunięcie wpisu cofnie też korektę budżetu
+        const daysLeft = remainingDaysAfterTopup(fromDate);
+        toast = 'Poduszka zasilona o ' + formatPLN(amount) + '. Dzienny budżet niższy o ' +
+          formatPLN(amount / daysLeft) + ' przez ' + daysLeft + (daysLeft === 1 ? ' dzień.' : ' dni.');
+      }
+    }
+    state.buffer.log.push(entry);
     amtEl.value = ''; noteEl.value = '';
     renderAll();
-    return persist(type === 'topup' ? 'Zasilono bufor.' : 'Zapisano wydatek z bufora.');
+    return persist(toast);
   }
+  document.getElementById('bufferRecalcBtn').addEventListener('click', () => {
+    const list = budgetAdjustmentsThisMonth();
+    if (!list.length) return showToast('Nie ma zasileń z bieżącego budżetu — nie ma czego przeliczać.');
+    const days = remainingDaysFromAdjustments();
+    const total = list.reduce((s, a) => s + a.amount, 0);
+    const spent = days.reduce((s, d) => s + dailySpendTotalForDate(d), 0);
+    const pool = days.reduce((s, d) => s + baseDailyRate(d), 0);
+    const res = document.getElementById('bufferRecalcResult');
+    res.textContent = 'Od ' + formatDayMonth(days[0]) + ' do końca miesiąca: ' + days.length +
+      (days.length === 1 ? ' dzień' : ' dni') + ', razem ' + formatPLN(pool) + ' budżetu (po odjęciu ' +
+      formatPLN(total) + ' na poduszkę). Wydane w tych dniach: ' + formatPLN(spent) + '. ' +
+      (pool - spent >= 0 ? 'Zostaje: ' : 'Przekroczone o: ') + formatPLN(Math.abs(pool - spent)) + '.';
+    res.hidden = false;
+    res.style.display = '';
+    renderAll();
+    showToast('Dzienny budżet przeliczony od dnia zasilenia.');
+  });
+
   document.getElementById('bufferTopup').addEventListener('click', () => addBufferEntry('topup'));
   document.getElementById('bufferExpense').addEventListener('click', () => addBufferEntry('expense'));
 
@@ -6556,6 +6714,12 @@ function bindEvents(){
     if (!confirm('Usunąć ' + label + ' ' + formatPLN(entry.amount) + (entry.note ? ' („' + entry.note + '”)' : '') +
       ' z historii poduszki?\n\nSaldo przeliczy się od nowa. Tej operacji nie da się cofnąć.')) return;
     state.buffer.log = state.buffer.log.filter(x => x.id !== id);
+    // Zasilenie opłacone z bieżącego budżetu obniżało dzienną kwotę — po
+    // usunięciu wpisu ta korekta też musi zniknąć, inaczej budżet zostałby
+    // pomniejszony o coś, czego już nie ma.
+    if (entry.adjustmentId){
+      state.budgetAdjustments = (state.budgetAdjustments || []).filter(a => a.id !== entry.adjustmentId);
+    }
     renderAll();
     await persist('Usunięto wpis z historii poduszki.');
   });
@@ -6646,7 +6810,7 @@ function bindEvents(){
     if (amount < 0) return showToast('Podaj kwotę zero lub większą.');
     const dateKey = todayDateKey();
     const calc = computeBudget();
-    state.dailySpend.log.push({ id: uid(), date: dateKey, amount, note: noteEl.value.trim(), allowance: calc.daily, ts: Date.now() });
+    state.dailySpend.log.push({ id: uid(), date: dateKey, amount, note: noteEl.value.trim(), allowance: baseDailyRate(dateKey), ts: Date.now() });
     amtEl.value = ''; noteEl.value = '';
     renderAll();
     // Lista jest domyślnie schowana (patrz toggleTodaySpendList), ale zaraz po
@@ -6661,8 +6825,8 @@ function bindEvents(){
       toggleBtn.textContent = 'Ukryj dzisiejsze wydatki ▴';
     }
     const total = dailySpendTotalForDate(dateKey);
-    const diff = calc.daily - total;
-    const projectedTomorrow = calc.daily + cumulativeAdjustmentBefore(tomorrowDateKey());
+    const diff = baseDailyRate(dateKey) - total;
+    const projectedTomorrow = baseDailyRate(tomorrowDateKey()) + cumulativeAdjustmentBefore(tomorrowDateKey());
     const msg = diff >= 0
       ? ('Zapisano. Dziś wydane łącznie ' + formatPLN(total) + ' — zostaje jeszcze ' + formatPLN(diff) + '. Jutro budżet: ' + formatPLN(projectedTomorrow))
       : ('Zapisano. Dziś wydane łącznie ' + formatPLN(total) + ' — przekroczono o ' + formatPLN(-diff) + '. Jutro budżet: ' + formatPLN(projectedTomorrow));
@@ -6687,7 +6851,7 @@ function bindEvents(){
     // może przypisać dniu sprzed kilku dni, skoro budżet mógł się od tamtej
     // pory zmienić (patrz komentarz przy dailySpendAllowanceForDate).
     const calc = computeBudget();
-    state.dailySpend.log.push({ id: uid(), date: dateKey, amount, note: noteEl.value.trim(), allowance: calc.daily, ts: Date.now() });
+    state.dailySpend.log.push({ id: uid(), date: dateKey, amount, note: noteEl.value.trim(), allowance: baseDailyRate(dateKey), ts: Date.now() });
     amtEl.value = ''; noteEl.value = '';
     renderAll();
     const total = dailySpendTotalForDate(dateKey);
