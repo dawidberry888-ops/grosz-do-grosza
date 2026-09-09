@@ -144,6 +144,14 @@ html[data-font-size="large"]{ font-size:20px; }
 
 /* ============ BASE ============ */
 *{box-sizing:border-box;}
+/* Pas bezpieczeństwa: nawet gdyby kiedyś coś znów wystawało poza ekran,
+   strona nie ma prawa przesuwać się na boki. overscroll-behavior-x wyłącza
+   przy okazji "gumowe" odbijanie w poziomie przy przewijaniu palcem. */
+html, body{
+  max-width:100%;
+  overflow-x:hidden;
+  overscroll-behavior-x:none;
+}
 body{
   background:var(--paper);
   color:var(--ink);
@@ -331,8 +339,16 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="r
 }
 .field input, .field textarea, .field select{width:100%;}
 .field textarea{font-family:var(--font-mono); min-height:110px; resize:vertical;}
-.row{display:flex; gap:10px;}
-.row > *{flex:1;}
+/* Zgłoszenie Dawida: "czy możesz zrobić coś z tym, żeby appka nie 'pływała'
+   prawo-lewo? Czasami przesuwam palcem w dół lub górę i ekran przesuwa mi się
+   też prawo-lewo".
+   Przyczyna: .row to flex bez zawijania, a element formularza ma własną
+   szerokość minimalną (przeglądarka nie zwęża <input>/<select> poniżej ok.
+   170 px). Na wąskim telefonie dwa takie pola w jednym rzędzie nie mieściły
+   się i wypychały stronę w bok. flex-wrap pozwala im zejść do drugiej linii,
+   a min-width:0 pozwala im się w ogóle kurczyć. */
+.row{display:flex; gap:10px; flex-wrap:wrap;}
+.row > *{flex:1 1 140px; min-width:0;}
 .hint{font-size:0.75rem; color:var(--ink-faint); line-height:1.5;}
 
 button.btn{
@@ -355,6 +371,10 @@ button.btn:focus-visible, input:focus-visible, textarea:focus-visible, .tab:focu
 button.btn-primary{background:var(--accent); color:var(--accent-ink);}
 button.btn-ghost{background:transparent; color:var(--ink); border:1px solid var(--line);}
 button.btn-danger-ghost{background:transparent; color:var(--warn); border:1px solid var(--warn);}
+/* Długa etykieta przycisku (tu: eksport wykluczeń w trybie admina) nie może
+   rozpychać karty — button.btn ma white-space:nowrap, więc pozwalamy jej się
+   złamać. To był ostatni element wypychający stronę w bok na 320 px. */
+#exportRecipeExclusionsBtn{white-space:normal; max-width:100%;}
 button.btn-block{
   width:100%;
   /* Przyciski na całą szerokość MOGĄ łamać tekst — inaczej dłuższa etykieta
@@ -535,7 +555,10 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
 .cal-nav{display:flex; align-items:center; justify-content:space-between;}
 .cal-nav strong{font-family:var(--font-display); font-size:0.9375rem; text-transform:capitalize;}
 .cal-weekdays{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; font-size:0.625rem; color:var(--ink-faint); text-align:center;}
-.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+/* minmax(0,1fr), nie samo 1fr: domyślnie kratka nie może zwęzić się poniżej
+   swojej zawartości, więc długa kwota (np. "+1517,80") rozpychała siatkę i
+   całą stronę w bok na wąskich telefonach. */
+.cal-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px;}
 .cal-cell{
   aspect-ratio:1;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -555,7 +578,12 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
    wąska, więc do tego lekko zmniejszona czcionka i zwężone odstępy. */
 .cal-cell .cal-amount{
   font-size:0.5rem; font-variant-numeric:tabular-nums;
-  white-space:nowrap; letter-spacing:-.02em; max-width:100%;
+  white-space:nowrap; letter-spacing:-.02em; max-width:100%; overflow:hidden;
+}
+/* Na najwęższych telefonach (iPhone SE i podobne) kratka ma ok. 36 px —
+   przy tym stopniu pisma mieści się nawet czterocyfrowa kwota. */
+@media (max-width: 380px){
+  .cal-cell .cal-amount{font-size:0.4375rem; letter-spacing:-.03em;}
 }
 .cal-cell.good .cal-amount{color:var(--growth);}
 .cal-cell.warn .cal-amount{color:var(--warn);}
@@ -791,12 +819,22 @@ nav.tabbar{
   padding:8px 6px calc(8px + env(safe-area-inset-bottom));
   z-index:40;
 }
+/* min-width:0 — bez tego najdłuższa etykieta ("Osiągnięcia") nie pozwala
+   przyciskowi się zwęzić i cały pasek wystaje poza ekran na wąskim telefonie
+   (zgłoszenie Dawida o przesuwaniu appki w bok). */
 .tab{
-  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px;
   background:none; border:none; cursor:pointer; padding:4px 2px;
   color:var(--nav-ink); font-family:var(--font-body); font-size:0.6875rem; font-weight:700; letter-spacing:.02em;
 }
-.tab .icon{display:flex; align-items:center; justify-content:center; width:52px; height:30px; border-radius:15px; line-height:1;}
+.tab .icon{display:flex; align-items:center; justify-content:center; width:52px; height:30px; border-radius:15px; line-height:1; flex:none; max-width:100%;}
+/* Najwęższe telefony: pasek musi zmieścić pięć podpisów, więc lekko zwężamy
+   ikony i zmniejszamy pismo zamiast pozwolić mu wyjść poza ekran. */
+@media (max-width: 360px){
+  .tab{font-size:0.625rem;}
+  .tab .icon{width:44px;}
+  .tab.tab-primary .icon{width:50px;}
+}
 .tab .icon svg{width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
 .tab.active{color:var(--nav-active);}
 .tab.active .icon{background:var(--nav-active-bg);}
@@ -1094,6 +1132,14 @@ nav.tabbar{
 
   <!-- ================= USTAWIENIA (menu "Więcej") ================= -->
   <section class="panel" data-panel="ustawienia">
+    <!-- Znacznik wersji. Powód: Dawid zgłosił, że "nie ma nowych opcji", a plik
+         u mnie je miał — bez widocznego numeru wersji nie da się szybko
+         rozstrzygnąć, czy nowy plik faktycznie wszedł na serwer i czy telefon
+         nie trzyma starej kopii w pamięci podręcznej. -->
+    <div class="card">
+      <h2>Wersja appki<span class="sub" id="appVersionSub">—</span></h2>
+      <div class="hint">Jeśli po wgraniu nowej wersji na GitHub numer się nie zmienił, telefon pokazuje jeszcze starą kopię — zamknij appkę całkowicie i otwórz ponownie.</div>
+    </div>
     <div class="card">
       <h2>Wygląd appki<span class="sub">Trzy layouty do wyboru — każdy ma własne kolory i krój pisma. Jasny/ciemny tryb appka dobiera sama wg ustawień telefonu.</span></h2>
       <div id="paletteChooser" class="layout-row"></div>
@@ -2167,6 +2213,7 @@ let priceReportsCache = [];
    każdy i tak mógłby je sobie zmienić przez konsolę przeglądarki), to
    tylko sposób, żeby zwykli użytkownicy nie trafili na tę sekcję przez
    przypadek. */
+const APP_VERSION = '2026-09-09 · 15'; // bump przy każdym wydaniu pliku
 const ADMIN_MODE = /(^|[?&])admin=1(&|$)/.test(location.search);
 
 let currentFilter = '';
@@ -4431,6 +4478,8 @@ function renderAll(){
   renderShoppingList();
   renderRecipesPanel();
   if (ADMIN_MODE) renderCuratorPanel(); // narzędzie kuratora — poza ?admin=1 zakładki w ogóle nie ma
+  const verEl = document.getElementById('appVersionSub');
+  if (verEl) verEl.textContent = APP_VERSION;
   renderUserCitySetting();
   renderPaletteChooser();
   renderFontSizeChooser();
