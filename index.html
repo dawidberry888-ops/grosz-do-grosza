@@ -440,6 +440,10 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
 
 .savings-entry{display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:0.8125rem;}
 .savings-entry:last-child{border-bottom:none;}
+/* Wiersz historii poduszki ma teraz trzeci element (przycisk "Usuń"), więc
+   opis musi móc się zwężać, a kwota i przycisk zostać w całości. */
+.savings-entry > span:first-child{flex:1; min-width:0;}
+.savings-entry .excl-btn{margin-top:0; margin-left:8px; flex:none;}
 
 /* store card */
 .store-card{
@@ -584,7 +588,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
   border:1px solid var(--line); border-radius:10px; background:var(--paper-raised);
   box-shadow:var(--shadow); max-height:280px; overflow-y:auto;
 }
-/* Ta sama pułapka co #contactBubblePanel/#moreTabMenu: reguła autora
+/* Ta sama pułapka co #contactBubblePanel: reguła autora
    ".category-dropdown-panel{display:flex}" ma pierwszeństwo nad domyślną
    regułą przeglądarki "[hidden]{display:none}", więc bez tego jawnego
    nadpisania samo ustawienie atrybutu hidden (albo wyczyszczenie inline
@@ -791,31 +795,57 @@ nav.tabbar{
 .tab .icon svg{width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
 .tab.active{color:var(--nav-active);}
 .tab.active .icon{background:var(--nav-active-bg);}
-.more-tab-item .icon{display:inline-flex; width:20px; height:20px;}
-.more-tab-item .icon svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round;}
+/* Środkowy przycisk "Dziś" jest wyniesiony ponad pasek i większy od reszty —
+   prośba Dawida ("ten button powinien być trochę większy, wyższy?"). To
+   ekran, na który wchodzi się kilka razy dziennie, więc dostaje najwygodniejsze
+   miejsce: środek paska, w naturalnym zasięgu kciuka. */
+.tab.tab-primary{font-size:0.75rem;}
+.tab.tab-primary .icon{
+  width:58px; height:44px; border-radius:22px; margin-top:-16px;
+  background:var(--nav-active-bg); box-shadow:0 4px 12px rgba(0,0,0,.14);
+}
+.tab.tab-primary .icon svg{width:26px; height:26px;}
+.tab.tab-primary.active .icon{background:var(--accent); color:var(--accent-ink);}
 
-/* Rozwijane menu "Więcej" (patrz #moreTabBtn/#moreTabMenu) — ten sam wzorzec
-   pływającej karty co #contactBubblePanel: position:fixed nad paskiem
-   zakładek, [hidden] jawnie nadpisuje "display", bo #id ma większą swoistość
-   niż domyślne [hidden]{display:none}. */
-#moreTabMenu{
-  /* bottom:136px — tyle samo, co #contactBubblePanel niżej — żeby menu nie
-     nachodziło wizualnie na dymek kontaktowy (#contactBubbleBtn), który jest
-     widoczny na każdej zakładce w tym samym, prawym rogu ekranu. */
-  position:fixed; right:8px; width:min(260px, calc(100vw - 16px));
-  bottom:calc(136px + env(safe-area-inset-bottom));
-  background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-sm);
-  box-shadow:0 8px 24px rgba(0,0,0,.14); padding:6px; z-index:41;
-  display:flex; flex-direction:column; gap:2px;
+/* Menu kafelkowe (zakładka "Więcej") — wzorowane na appce InPost, którą
+   Dawid podesłał: dwie kolumny, duże pola dotykowe, ikona + nazwa + krótki
+   podpis, co się pod tym kryje. */
+.menu-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.menu-tile{
+  display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+  background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:14px 12px; cursor:pointer; text-align:left; min-height:104px;
+  font-family:var(--font-body); color:var(--ink);
 }
-#moreTabMenu[hidden]{display:none;}
-.more-tab-item{
-  display:flex; align-items:center; gap:8px; width:100%; text-align:left;
-  background:none; border:none; cursor:pointer; padding:10px; border-radius:8px;
-  color:var(--ink); font-family:var(--font-body); font-size:0.875rem;
+.menu-tile:active{background:var(--paper-raised);}
+.menu-tile .icon{display:flex; align-items:center; justify-content:center; margin-bottom:2px; color:var(--accent);}
+.menu-tile .icon svg{width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+/* "Poduszka bezpieczeństwa" to najdłuższa nazwa w menu — przy 0.875rem
+   łamała się w środku wyrazu ("bezpieczeństw / a"). Mniejszy stopień pisma
+   plus dzielenie wyrazów (lang="pl" na <html>) trzyma ją w dwóch liniach. */
+.menu-tile .tname{font-weight:700; font-size:0.8125rem; line-height:1.3; hyphens:auto; overflow-wrap:break-word;}
+.menu-tile .tsub{font-size:0.6875rem; color:var(--ink-faint); line-height:1.35;}
+.menu-tile.active{border-color:var(--accent);}
+
+/* Powrót do menu kafelkowego z ekranu otwartego z "Więcej" (dokładany przez
+   JS, patrz addBackToMoreButtons) — bez niego jedyną drogą powrotu byłoby
+   ponowne kliknięcie "Więcej" w pasku, co nie każdy odgadnie. */
+.back-to-more{
+  align-self:flex-start; background:none; border:none; cursor:pointer; padding:2px 0;
+  color:var(--ink-soft); font-family:var(--font-body); font-size:0.8125rem; font-weight:600;
 }
-.more-tab-item:active{background:var(--paper);}
-.more-tab-item.active{color:var(--accent); font-weight:600;}
+.back-to-more:active{color:var(--accent);}
+
+/* Kafelki liczbowe w Statystykach. */
+.stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.stat-tile{
+  background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:12px; display:flex; flex-direction:column; gap:2px;
+}
+.stat-tile .sv{font-family:var(--font-mono); font-size:1.125rem; font-weight:700; font-variant-numeric:tabular-nums;}
+.stat-tile .sl{font-size:0.6875rem; color:var(--ink-faint); line-height:1.35;}
+.stat-tile .sv.good{color:var(--growth);}
+.stat-tile .sv.warn{color:var(--warn);}
 
 .faq-item{margin-bottom:16px;}
 .faq-item:last-child{margin-bottom:0;}
@@ -854,7 +884,7 @@ nav.tabbar{
 :root[data-layout="gazetka"] .cal-cell, :root[data-layout="gazetka"] .chip, :root[data-layout="gazetka"] .pill,
 :root[data-layout="gazetka"] button.btn, :root[data-layout="gazetka"] .field input, :root[data-layout="gazetka"] .field textarea,
 :root[data-layout="gazetka"] .field select, :root[data-layout="gazetka"] .info-box, :root[data-layout="gazetka"] .privacy-strip,
-:root[data-layout="gazetka"] #moreTabMenu, :root[data-layout="gazetka"] .more-tab-item, :root[data-layout="gazetka"] #contactBubblePanel,
+:root[data-layout="gazetka"] .menu-tile, :root[data-layout="gazetka"] .stat-tile, :root[data-layout="gazetka"] #contactBubblePanel,
 :root[data-layout="gazetka"] .layout-option, :root[data-layout="gazetka"] .fontsize-option, :root[data-layout="gazetka"] .list-toggle-btn,
 :root[data-layout="gazetka"] .excl-btn, :root[data-layout="gazetka"] .excl-chip, :root[data-layout="gazetka"] .vote-btn,
 :root[data-layout="gazetka"] .preport-input, :root[data-layout="gazetka"] .manage-product-row, :root[data-layout="gazetka"] .category-dropdown-panel,
@@ -931,9 +961,9 @@ nav.tabbar{
 }
 :root[data-layout="kuchnia"] .tab{color:var(--nav-ink);}
 :root[data-layout="kuchnia"] .tab .icon{width:48px; height:34px; border-radius:17px;}
+:root[data-layout="kuchnia"] .tab.tab-primary .icon{width:60px; height:48px; border-radius:24px; margin-top:-18px;}
 :root[data-layout="kuchnia"] .tab.active .icon{background:var(--nav-active-bg); color:var(--nav-active);}
 :root[data-layout="kuchnia"] .tab.active{color:#f6efe4;}
-:root[data-layout="kuchnia"] #moreTabMenu{bottom:calc(150px + env(safe-area-inset-bottom));}
 :root[data-layout="kuchnia"] #contactBubbleBtn{bottom:calc(100px + env(safe-area-inset-bottom)); background:var(--ink); color:var(--paper);}
 :root[data-layout="kuchnia"] #contactBubblePanel{bottom:calc(160px + env(safe-area-inset-bottom));}
 
@@ -1138,7 +1168,7 @@ nav.tabbar{
     </div>
 
     <div class="card">
-      <h2>Bufor na nieprzewidziane<span class="sub">Poduszka na nagłe wydatki</span></h2>
+      <h2>Poduszka bezpieczeństwa<span class="sub">Na nagłe wydatki</span></h2>
       <div id="bufferSummaryMini"></div>
     </div>
 
@@ -1193,12 +1223,12 @@ nav.tabbar{
     </div>
 
     <div class="card">
-      <h2>Bufor na nieprzewidziane<span class="sub">Leki, awarie, paliwo poza planem… — osobna poduszka, nie z dziennego budżetu</span></h2>
+      <h2>Poduszka bezpieczeństwa<span class="sub">Leki, awarie, paliwo poza planem… — osobna pula, nie z dziennego budżetu</span></h2>
       <div class="field">
         <label for="bufferGoalInput">Kwota (zł) / miesiąc</label>
         <input id="bufferGoalInput" inputmode="decimal" placeholder="np. 100">
       </div>
-      <div class="hint">Ta kwota też pomniejsza dzienny budżet — ale zamiast znikać, trafia na saldo bufora w zakładce Cele, z którego możesz korzystać, gdy coś się wydarzy.</div>
+      <div class="hint">Ta kwota też pomniejsza dzienny budżet — ale zamiast znikać, trafia na saldo Poduszki bezpieczeństwa, z którego możesz korzystać, gdy coś się wydarzy.</div>
     </div>
 
     <!-- Przeliczanie całego miesiąca dzieje się teraz samo (patrz
@@ -1266,31 +1296,39 @@ nav.tabbar{
       <div class="caption" id="projectionCaption" style="font-size:0.8125rem;color:var(--ink-soft);"></div>
     </div>
 
+  </section>
+
+
+  <!-- ================= PODUSZKA BEZPIECZEŃSTWA =================
+       Wydzielona z zakładki "Osiągnięcia" (dawniej Cele i oszczędności) na
+       prośbę Dawida: w menu kafelkowym ma być osobną pozycją. Dzięki temu
+       "Osiągnięcia" zostają o celach i trofeach, a poduszka ma swój ekran. -->
+  <section class="panel" data-panel="poduszka">
     <div class="card" id="bufferRolloverBanner" hidden style="background:var(--accent-soft); border-color:var(--accent); flex-direction:column; gap:10px;">
-      <h2 style="margin:0;">💰 Nowy miesiąc, a w buforze zostało...<span class="sub" id="bufferRolloverText"></span></h2>
+      <h2 style="margin:0;">💰 Nowy miesiąc, a w poduszce zostało...<span class="sub" id="bufferRolloverText"></span></h2>
       <div class="row">
-        <button type="button" class="btn btn-ghost" id="bufferRolloverKeep">Zostaw w buforze</button>
+        <button type="button" class="btn btn-ghost" id="bufferRolloverKeep">Zostaw w poduszce</button>
         <button type="button" class="btn btn-primary" id="bufferRolloverTransfer">Przelej do oszczędności</button>
       </div>
     </div>
 
     <div class="card" id="extraSavingsCard" hidden>
-      <h2>Dodatkowe oszczędności<span class="sub">Nadwyżki bufora przelane tu ręcznie, miesiąc po miesiącu</span></h2>
-      <div class="hint">💡 Appka tylko liczy — ten wpis to zapis Twojej decyzji, nie prawdziwy przelew. Skoro zdecydowałeś/aś, że nadwyżka bufora idzie na oszczędności, przelej ją od razu (np. na osobne konto oszczędnościowe) — inaczej te pieniądze zostają na koncie bieżącym i łatwo je później wydać przy okazji, mimo że appka pokaże je już jako „odłożone”.</div>
+      <h2>Dodatkowe oszczędności<span class="sub">Nadwyżki poduszki przelane tu ręcznie, miesiąc po miesiącu</span></h2>
+      <div class="hint">💡 Appka tylko liczy — ten wpis to zapis Twojej decyzji, nie prawdziwy przelew. Skoro zdecydowałeś/aś, że nadwyżka poduszki idzie na oszczędności, przelej ją od razu (np. na osobne konto oszczędnościowe) — inaczej te pieniądze zostają na koncie bieżącym i łatwo je później wydać przy okazji, mimo że appka pokaże je już jako „odłożone”.</div>
       <div id="extraSavingsList"></div>
       <div class="total-row"><span>Razem</span><span class="mono" id="extraSavingsTotal">0,00 zł</span></div>
     </div>
 
     <div class="card">
-      <h2>Poduszka bezpieczeństwa<span class="sub" id="bufferGoalSub">Bufor na nieprzewidziane</span></h2>
+      <h2>Poduszka bezpieczeństwa<span class="sub" id="bufferGoalSub">Na nieprzewidziane wydatki</span></h2>
       <div class="hero" id="bufferHero" style="padding:18px; text-align:left;">
-        <div class="eyebrow">Saldo bufora</div>
+        <div class="eyebrow">Saldo poduszki</div>
         <div class="amount" id="bufferBalanceAmount" style="font-size:2.125rem;">0,00 <span class="zl">zł</span></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Zasil bufor lub zapisz wydatek</h2>
+      <h2>Zasil poduszkę lub zapisz wydatek</h2>
       <div class="row">
         <input id="bufferAmount" inputmode="decimal" placeholder="Kwota, np. 45,00">
       </div>
@@ -1298,14 +1336,14 @@ nav.tabbar{
         <input id="bufferNote" placeholder="Notatka (np. leki na przeziębienie)">
       </div>
       <div class="row">
-        <button class="btn btn-ghost" id="bufferTopup">+ Zasil bufor</button>
-        <button class="btn btn-danger-ghost" id="bufferExpense">− Wydatek z bufora</button>
+        <button class="btn btn-ghost" id="bufferTopup">+ Zasil poduszkę</button>
+        <button class="btn btn-danger-ghost" id="bufferExpense">− Wydatek z poduszki</button>
       </div>
-      <div class="hint">Nagły wydatek (leki, awaria, nieplanowany dojazd) zapisujesz tutaj — zejdzie z salda bufora, a nie z dzisiejszego budżetu.</div>
+      <div class="hint">Nagły wydatek (leki, awaria, nieplanowany dojazd) zapisujesz tutaj — zejdzie z salda poduszki, a nie z dzisiejszego budżetu.</div>
     </div>
 
     <div class="card">
-      <h2>Historia bufora</h2>
+      <h2>Historia poduszki</h2>
       <button type="button" class="btn btn-ghost btn-block" id="toggleBufferHistory" aria-expanded="false" aria-controls="bufferHistoryBox">Pokaż historię ▾</button>
       <div id="bufferHistoryBox" hidden style="flex-direction:column; margin-top:4px;">
         <div id="bufferHistory"></div>
@@ -1540,30 +1578,76 @@ nav.tabbar{
     </div>
   </section>
 
-  <!-- Pasek zakładek (nowy layout): 4 główne + "Więcej". Cele i Sklepy
-       przeszły do menu "Więcej" razem z Ustawieniami i FAQ — 7 pozycji w
-       pasku było za ciasno na telefonie, a ikony-emoji wyglądały na każdym
-       systemie inaczej; teraz to rysowane ikony (SVG), które przyjmują kolor
-       layoutu. Głównymi zakładkami zostały te, do których wchodzi się co
-       dzień: Dziś, Promocje, Przepisy, Budżet. -->
+
+  <!-- ================= WIĘCEJ (menu kafelkowe) =================
+       Zamiast wysuwanej listy — ekran z kafelkami, na wzór appki InPost,
+       którą Dawid podesłał jako przykład. Kafelki są duże, podpisane i
+       zawsze w tym samym miejscu, więc trafia się w nie kciukiem bez
+       celowania w wąskie wiersze menu. -->
+  <section class="panel" data-panel="wiecej">
+    <div class="card">
+      <h2>Więcej<span class="sub">Wszystko, czego nie ma w dolnym pasku</span></h2>
+      <div class="menu-grid" id="moreMenuGrid">
+        <button type="button" class="menu-tile" data-tab="poduszka"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.4-3.2 7.9-8 9-4.8-1.1-8-4.6-8-9V6z"/></svg></span><span class="tname">Poduszka bezpieczeństwa</span><span class="tsub">Saldo na nagłe wydatki</span></button>
+        <button type="button" class="menu-tile" data-tab="sklepy"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="tname">Sklepy w okolicy</span><span class="tsub">Odległości i mapa</span></button>
+        <button type="button" class="menu-tile" data-tab="przepisy"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M6 19V9a6 6 0 0 1 12 0v10"/><path d="M12 3v2"/></svg></span><span class="tname">Przepisy</span><span class="tsub">Z tego, co jest w promocji</span></button>
+        <button type="button" class="menu-tile" data-tab="statystyki"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg></span><span class="tname">Statystyki</span><span class="tsub">Liczby o Twoich wydatkach</span></button>
+        <button type="button" class="menu-tile" data-tab="faq"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><circle cx="12" cy="17" r=".6"/></svg></span><span class="tname">FAQ</span><span class="tsub">Pytania i odpowiedzi</span></button>
+        <button type="button" class="menu-tile" data-tab="ustawienia"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span><span class="tname">Ustawienia</span><span class="tsub">Wygląd, czcionka, dane</span></button>
+        <!-- Kafelek kuratora chowany poza ?admin=1 (patrz init). -->
+        <button type="button" class="menu-tile" data-tab="kurator" id="curatorTabItem"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><path d="M17 16l4 4"/><path d="M21 16l-4 4"/></svg></span><span class="tname">Kurator</span><span class="tsub">Dopasowania produktów</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STATYSTYKI =================
+       Prośba Dawida: "to NOWOŚĆ! myślę że super, typowo dla Nerdów". Cała
+       zawartość liczy się na żywo z state.dailySpend.log — żadnych osobnych
+       liczników, których dałoby się rozsynchronizować z historią wpisów. -->
+  <section class="panel" data-panel="statystyki">
+    <div class="card">
+      <h2>W skrócie<span class="sub" id="statsRangeSub">—</span></h2>
+      <div class="stat-grid" id="statsTiles"></div>
+    </div>
+
+    <div class="card">
+      <h2>Który dzień tygodnia jest najdroższy<span class="sub">Średni wydatek z całej Twojej historii</span></h2>
+      <div class="chart-wrap" id="statsWeekdayChart"></div>
+      <div class="caption" id="statsWeekdayCaption" style="font-size:0.8125rem;color:var(--ink-soft);"></div>
+    </div>
+
+    <div class="card">
+      <h2>Ten miesiąc<span class="sub">Tempo i prognoza do końca miesiąca</span></h2>
+      <div id="statsMonth"></div>
+    </div>
+
+    <div class="card">
+      <h2>Na co najczęściej<span class="sub">Zliczone po opisie wpisu — dlatego warto je wypełniać</span></h2>
+      <div id="statsTopNotes"></div>
+    </div>
+
+    <div class="card">
+      <h2>Rekordy<span class="sub">Twoje skrajne dni</span></h2>
+      <div id="statsRecords"></div>
+    </div>
+  </section>
+
+  <!-- Pasek zakładek. Kolejność i wyróżnienie środkowego przycisku — prośba
+       Dawida: "od lewej: Budżet, potem Promocje, potem Dziś (ten button
+       powinien być trochę większy, wyższy?), potem Osiągnięcia i na koniec
+       Więcej". "Dziś" to ekran, na który wchodzi się najczęściej, więc siedzi
+       pośrodku, w zasięgu kciuka, i jest wizualnie wyniesiony ponad pasek.
+
+       "Więcej" NIE jest już rozwijaną listą — to pełnoprawna zakładka z
+       menu kafelkowym (patrz panel data-panel="wiecej"), na wzór appki
+       InPost, którą Dawid podesłał jako przykład. -->
   <nav class="tabbar">
-    <button class="tab" data-tab="dzis"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Dziś</button>
-    <button class="tab" data-tab="promocje"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4L13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>Promocje</button>
-    <button class="tab" data-tab="przepisy"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M6 19V9a6 6 0 0 1 12 0v10"/><path d="M12 3v2"/></svg></span>Przepisy</button>
     <button class="tab" data-tab="budzet"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>Budżet</button>
-    <!-- "Więcej" NIE jest zwykłą zakładką (brak data-tab, więc omija ogólne
-         .tab[data-tab] click-binding w bindEvents) — otwiera osobne, małe
-         rozwijane menu (#moreTabMenu) nad paskiem. -->
-    <button type="button" class="tab" id="moreTabBtn" aria-haspopup="true" aria-expanded="false" aria-controls="moreTabMenu"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span>Więcej</button>
+    <button class="tab" data-tab="promocje"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4L13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>Promocje</button>
+    <button class="tab tab-primary" data-tab="dzis"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></span>Dziś</button>
+    <button class="tab" data-tab="oszczednosci"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4"/><path d="M17 6h3a3 3 0 0 1-3 4"/></svg></span>Osiągnięcia</button>
+    <button class="tab" data-tab="wiecej"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span>Więcej</button>
   </nav>
-  <div id="moreTabMenu" hidden>
-    <button type="button" class="more-tab-item" data-tab="oszczednosci"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4"/><path d="M17 6h3a3 3 0 0 1-3 4"/></svg></span>Cele i oszczędności</button>
-    <button type="button" class="more-tab-item" data-tab="sklepy"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>Sklepy w okolicy</button>
-    <button type="button" class="more-tab-item" data-tab="ustawienia"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>Ustawienia i wygląd</button>
-    <button type="button" class="more-tab-item" data-tab="faq"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><circle cx="12" cy="17" r=".6"/></svg></span>FAQ — pytania i odpowiedzi</button>
-    <!-- Ukrywane poza ?admin=1 (patrz init) — narzędzie kuratora, nie funkcja appki. -->
-    <button type="button" class="more-tab-item" data-tab="kurator" id="curatorTabItem"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><path d="M17 16l4 4"/><path d="M21 16l-4 4"/></svg></span>Kurator (dopasowania)</button>
-  </div>
 
   <button type="button" id="contactBubbleBtn" aria-expanded="false" aria-controls="contactBubblePanel" title="Masz pytania, sugestie, wątpliwości? Napisz do nas.">💬</button>
   <div id="contactBubblePanel" hidden>
@@ -1739,7 +1823,7 @@ const MEDAL_TIERS = [
    liczące niżej (bestEverStreakDays, monthlyAwards, quarterlyAwards) i renderTrophyCabinet(). */
 const ACTION_BADGES = [
   { id: 'fixedCosts', icon: '👣', label: 'Pierwszy krok', desc: 'Dodałeś/aś swoje koszty stałe — masz już plan!' },
-  { id: 'buffer', icon: '🛡️', label: 'Przezorny zawsze ubezpieczony', desc: 'Dodałeś/aś bufor na nieprzewidziane wydatki' }
+  { id: 'buffer', icon: '🛡️', label: 'Przezorny zawsze ubezpieczony', desc: 'Dodałeś/aś poduszkę bezpieczeństwa na nieprzewidziane wydatki' }
 ];
 const STREAK_BADGES = [
   { id: 'streak3', days: 3, icon: '🔥', label: 'Mini Saver Master', desc: 'Udało Ci się zmieścić w wydatkach przez 3 dni z rzędu!' },
@@ -4199,6 +4283,7 @@ function renderAll(){
   renderBufferRolloverBanner();
   renderExtraSavingsFromBuffer();
   renderStoresPanel();
+  renderStatsPanel();
   renderBudgetBasketByStore();
   renderProductsPanel();
   renderManageProductsList();
@@ -4806,7 +4891,7 @@ function renderMonthSummary(){
     row('Dochód', formatPLN(calc.income)),
     row('Koszty stałe', '−' + formatPLN(calc.fixedTotal)),
     row('Cel oszczędności', '−' + formatPLN(calc.savingsGoal)),
-    row('Bufor na nieprzewidziane', '−' + formatPLN(calc.bufferGoal)),
+    row('Poduszka bezpieczeństwa', '−' + formatPLN(calc.bufferGoal)),
     '<div class="total-row"><span>Zostaje na wydatki</span><span class="mono">' + formatPLN(calc.totalForSpending) + '</span></div>',
     row('Budżet dzienny (bazowy, przed korektą)', formatPLN(calc.daily))
   ].join('');
@@ -4847,7 +4932,7 @@ function renderSavingsSummaryMini(){
 function renderBufferSummaryMini(){
   const el = document.getElementById('bufferSummaryMini');
   if (!state.budget.bufferGoal && !state.buffer.log.length){
-    el.innerHTML = '<div class="empty-state">Ustaw miesięczną wpłatę do bufora w zakładce Budżet.</div>';
+    el.innerHTML = '<div class="empty-state">Ustaw miesięczną wpłatę do poduszki w zakładce Budżet.</div>';
     return;
   }
   const balance = bufferBalance();
@@ -5242,6 +5327,149 @@ function renderProjectionChart(){
   caption.textContent = 'Przy ' + basis + ' za 6 miesięcy odłożysz ok. ' + formatPLN(max) + '.';
 }
 
+/* ================= STATYSTYKI =================
+   Prośba Dawida: "Statystyki (to NOWOŚĆ!) myślę że super, typowo dla Nerdów".
+   Wszystko liczone na żywo z state.dailySpend.log — żadnych osobnych
+   liczników, które mogłyby się rozjechać z historią wpisów.
+
+   Wszędzie, gdzie mowa o "dniach", liczą się te same dni co w rozliczeniu
+   budżetu: od pierwszego wpisu w appce do dzisiaj, a dzień bez zakupów to
+   dzień z wydatkiem 0 zł (patrz cumulativeAdjustmentBefore). Dzięki temu
+   "średnio dziennie" nie zawyża się przez pominięcie dni, w których nic nie
+   kupiłeś — a to najczęstszy błąd takich statystyk. */
+const WEEKDAY_NAMES_PL = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+
+/* Wszystkie dni od pierwszego wpisu do dzisiaj (także te bez zakupów). */
+function statsAllCountedDays(){
+  const firstEver = firstEverLoggedDateKey();
+  if (firstEver === null) return [];
+  const out = [];
+  for (let d = firstEver; d <= todayDateKey(); d = dateKeyAddDays(d, 1)) out.push(d);
+  return out;
+}
+
+function renderStatsPanel(){
+  const tilesEl = document.getElementById('statsTiles');
+  if (!tilesEl) return;
+  const days = statsAllCountedDays();
+  const sub = document.getElementById('statsRangeSub');
+
+  if (!days.length){
+    sub.textContent = 'Brak danych';
+    tilesEl.innerHTML = '<div class="empty-state">Zapisz pierwszy wydatek w zakładce <strong>Dziś</strong> — statystyki policzą się same.</div>';
+    ['statsWeekdayChart', 'statsMonth', 'statsTopNotes', 'statsRecords'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.innerHTML = '';
+    });
+    document.getElementById('statsWeekdayCaption').textContent = '';
+    return;
+  }
+
+  const daily = computeBudget().daily;
+  const spentByDay = days.map(d => ({ date: d, spent: dailySpendTotalForDate(d), items: dailySpendItemsForDate(d).length }));
+  const totalSpent = spentByDay.reduce((s, d) => s + d.spent, 0);
+  const avgPerDay = totalSpent / days.length;
+  const withPurchases = spentByDay.filter(d => d.items > 0);
+  const inBudget = spentByDay.filter(d => d.spent <= daily + 0.005).length;
+  const inBudgetPct = Math.round((inBudget / days.length) * 100);
+
+  // Najdłuższa seria dni pod dziennym budżetem (dni bez zakupów też się liczą).
+  let best = 0, run = 0;
+  for (const d of spentByDay){
+    if (d.spent <= daily + 0.005){ run++; best = Math.max(best, run); } else run = 0;
+  }
+
+  const firstLabel = new Date(days[0] + 'T00:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+  sub.textContent = days.length + (days.length === 1 ? ' dzień' : ' dni') + ' od ' + firstLabel;
+
+  const tile = (value, label, cls) =>
+    '<div class="stat-tile"><span class="sv' + (cls ? ' ' + cls : '') + '">' + value + '</span><span class="sl">' + label + '</span></div>';
+  tilesEl.innerHTML =
+    tile(formatPLN(avgPerDay), 'Średnio dziennie (dni bez zakupów też się liczą)') +
+    tile(inBudgetPct + '%', 'Dni zmieszczonych w dziennym budżecie (' + inBudget + ' z ' + days.length + ')', inBudgetPct >= 50 ? 'good' : 'warn') +
+    tile(best + (best === 1 ? ' dzień' : ' dni'), 'Najdłuższa seria dni pod budżetem') +
+    tile(formatPLN(totalSpent), 'Wydane łącznie od początku');
+
+  // ---- Dzień tygodnia ----
+  const buckets = WEEKDAY_NAMES_PL.map(() => ({ sum: 0, n: 0 }));
+  for (const d of spentByDay){
+    const idx = (new Date(d.date + 'T00:00:00').getDay() + 6) % 7; // poniedziałek = 0
+    buckets[idx].sum += d.spent;
+    buckets[idx].n++;
+  }
+  const avgs = buckets.map(b => b.n ? b.sum / b.n : 0);
+  const maxAvg = Math.max(...avgs, 0.01);
+  document.getElementById('statsWeekdayChart').innerHTML = avgs.map((v, i) =>
+    '<div class="chart-bar" title="' + WEEKDAY_NAMES_PL[i] + ': ' + formatPLN(v) + '">' +
+    '<div class="bar" style="height:' + Math.max(4, (v / maxAvg * 100)) + '%; background:' + (v > daily ? 'var(--warn)' : 'var(--growth)') + ';"></div>' +
+    '<div class="lbl">' + WEEKDAY_NAMES_PL[i] + '</div></div>'
+  ).join('');
+  // Dni tygodnia, które jeszcze się nie trafiły (krótka historia), pomijamy —
+  // inaczej "najtańszy dzień tygodnia" pokazywałby 0,00 zł dla dnia, którego
+  // po prostu nie było jeszcze w danych.
+  const seen = avgs.map((v, i) => (buckets[i].n ? v : null));
+  const present = seen.filter(v => v !== null);
+  const worst = seen.indexOf(Math.max(...present));
+  const bestDay = seen.indexOf(Math.min(...present));
+  document.getElementById('statsWeekdayCaption').textContent =
+    'Najdroższy dzień tygodnia: ' + WEEKDAY_NAMES_PL[worst] + ' (średnio ' + formatPLN(avgs[worst]) + '). ' +
+    'Najtańszy: ' + WEEKDAY_NAMES_PL[bestDay] + ' (średnio ' + formatPLN(avgs[bestDay]) + '). ' +
+    'Czerwony słupek = powyżej dziennego budżetu ' + formatPLN(daily) + '.';
+
+  // ---- Ten miesiąc ----
+  const monthDays = billedDaysThisMonth();
+  const monthSpent = monthDays.reduce((s, d) => s + dailySpendTotalForDate(d), 0);
+  const pacePerDay = monthDays.length ? monthSpent / monthDays.length : 0;
+  const dim = computeBudget().dim;
+  const daysLeft = Math.max(0, dim - Number(todayDateKey().slice(8, 10)));
+  const forecast = monthSpent + pacePerDay * daysLeft;
+  const monthBudget = dim * daily;
+  const row = (label, val, cls) =>
+    '<div class="list-row"><span class="name">' + label + '</span><span class="amount' + (cls ? ' ' + cls : '') + '">' + val + '</span></div>';
+  document.getElementById('statsMonth').innerHTML =
+    row('Wydane w tym miesiącu', formatPLN(monthSpent)) +
+    row('Tempo', formatPLN(pacePerDay) + '/dzień', pacePerDay <= daily ? 'good' : 'warn') +
+    row('Budżet całego miesiąca', formatPLN(monthBudget)) +
+    row('Prognoza na koniec miesiąca', formatPLN(forecast), forecast <= monthBudget ? 'good' : 'warn') +
+    '<div class="hint">' + (forecast <= monthBudget
+      ? 'Przy tym tempie zmieścisz się w miesiącu i zostanie Ci ok. ' + formatPLN(monthBudget - forecast) + '.'
+      : 'Przy tym tempie przekroczysz miesięczny budżet o ok. ' + formatPLN(forecast - monthBudget) + '. Zostało ' + daysLeft + ' dni.') +
+    '</div>';
+
+  // ---- Na co najczęściej ----
+  const notes = {};
+  for (const e of state.dailySpend.log){
+    const key = (e.note || '').trim();
+    if (!key) continue;
+    const k = normalizePL(key);
+    if (!notes[k]) notes[k] = { label: key, sum: 0, n: 0 };
+    notes[k].sum += e.amount;
+    notes[k].n++;
+  }
+  const top = Object.values(notes).sort((a, b) => b.sum - a.sum).slice(0, 5);
+  document.getElementById('statsTopNotes').innerHTML = top.length
+    ? top.map(t => '<div class="savings-entry"><span>' + escapeHtml(t.label) +
+        ' <span class="hint">(' + t.n + (t.n === 1 ? ' raz' : ' razy') + ')</span></span>' +
+        '<span class="mono">' + formatPLN(t.sum) + '</span></div>').join('')
+    : '<div class="empty-state">Żaden wpis nie ma jeszcze opisu. Wpisuj „na co”, a appka pokaże, co zjada najwięcej.</div>';
+
+  // ---- Rekordy ----
+  const recs = [];
+  if (withPurchases.length){
+    const maxDay = withPurchases.reduce((a, b) => (b.spent > a.spent ? b : a));
+    const minDay = withPurchases.reduce((a, b) => (b.spent < a.spent ? b : a));
+    const busiest = withPurchases.reduce((a, b) => (b.items > a.items ? b : a));
+    const fmtDate = k => new Date(k + 'T00:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
+    recs.push(row('Najdroższy dzień', formatPLN(maxDay.spent) + ' · ' + fmtDate(maxDay.date), 'warn'));
+    recs.push(row('Najtańszy dzień z zakupami', formatPLN(minDay.spent) + ' · ' + fmtDate(minDay.date), 'good'));
+    const n = busiest.items;
+    const nWord = n === 1 ? 'wpis' : ((n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'wpisy' : 'wpisów');
+    recs.push(row('Najwięcej wpisów w jednym dniu', n + ' ' + nWord + ' · ' + fmtDate(busiest.date)));
+  }
+  const zeroDays = spentByDay.filter(d => d.spent === 0).length;
+  recs.push(row('Dni bez żadnego wydatku', zeroDays + ' z ' + days.length, zeroDays > 0 ? 'good' : ''));
+  document.getElementById('statsRecords').innerHTML = recs.join('');
+}
+
 function renderBufferPanel(){
   document.getElementById('bufferGoalSub').textContent = state.budget.bufferGoal
     ? ('Miesięczna wpłata: ' + formatPLN(state.budget.bufferGoal))
@@ -5251,15 +5479,21 @@ function renderBufferPanel(){
   const hist = document.getElementById('bufferHistory');
   const log = [...state.buffer.log].sort((a,b) => b.ts - a.ts);
   if (!log.length){
-    hist.innerHTML = '<div class="empty-state">Brak ruchów na buforze. Zasil go powyżej.</div>';
+    hist.innerHTML = '<div class="empty-state">Brak ruchów na poduszce. Zasil ją powyżej.</div>';
   } else {
     hist.innerHTML = log.map(e => {
       const sign = e.type === 'topup' ? '+' : '−';
       const cls = e.type === 'topup' ? 'good' : 'warn';
       const label = e.type === 'topup' ? 'Wpłata' : 'Wydatek';
       const date = new Date(e.ts).toLocaleDateString('pl-PL', { day:'2-digit', month:'2-digit' });
+      // Prośba Dawida: "dodaj możliwość usunięcia wrzuconych kosztów". Wpis na
+      // poduszce to zwykle ręczna decyzja ("zasiliłem", "wziąłem na leki") i
+      // równie łatwo się w niej pomylić, co przy dziennym wydatku — a tam
+      // usuwanie jest od dawna. Kasujemy pojedynczą pozycję, saldo przelicza
+      // się samo (patrz bufferBalance), nic innego nie jest ruszane.
       return '<div class="savings-entry"><span>' + date + ' — ' + label + (e.note ? ' <span class="hint">(' + escapeHtml(e.note) + ')</span>' : '') + '</span>' +
-        '<span class="mono pill ' + cls + '">' + sign + formatPLN(e.amount) + '</span></div>';
+        '<span class="mono pill ' + cls + '">' + sign + formatPLN(e.amount) + '</span>' +
+        '<button type="button" class="excl-btn" data-buffer-delete="' + escapeHtml(e.id || '') + '" title="Usuń ten wpis z historii poduszki">Usuń</button></div>';
     }).join('');
   }
 }
@@ -5276,7 +5510,7 @@ function renderBufferRolloverBanner(){
     const [y, m] = pending.fromMonth.split('-').map(Number);
     const monthLabel = new Date(y, m - 1, 1).toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
     document.getElementById('bufferRolloverText').textContent =
-      'Z ' + monthLabel + ' zostało w buforze ' + formatPLN(pending.amount) + '. Zostawić na kolejny miesiąc, czy przelać do oszczędności?';
+      'Z ' + monthLabel + ' zostało w poduszce ' + formatPLN(pending.amount) + '. Zostawić na kolejny miesiąc, czy przelać do oszczędności?';
   }
 }
 
@@ -5292,7 +5526,7 @@ function renderExtraSavingsFromBuffer(){
   const sorted = [...list].sort((a,b) => b.ts - a.ts);
   document.getElementById('extraSavingsList').innerHTML = sorted.map(e => {
     const date = new Date(e.ts).toLocaleDateString('pl-PL', { day:'2-digit', month:'2-digit', year:'numeric' });
-    return '<div class="savings-entry"><span>' + date + ' — nadwyżka bufora</span><span class="mono pill good">+' + formatPLN(e.amount) + '</span></div>';
+    return '<div class="savings-entry"><span>' + date + ' — nadwyżka poduszki</span><span class="mono pill good">+' + formatPLN(e.amount) + '</span></div>';
   }).join('');
   const total = list.reduce((sum, e) => sum + e.amount, 0);
   document.getElementById('extraSavingsTotal').textContent = formatPLN(total);
@@ -5774,17 +6008,25 @@ function renderBudgetBasketByStore(){
    EVENTS
    ==================================================================== */
 
-const MAIN_TABS = ['dzis', 'promocje', 'przepisy', 'budzet']; // reszta (Cele, Sklepy, Ustawienia, FAQ) siedzi w menu "Więcej"
+const MAIN_TABS = ['budzet', 'promocje', 'dzis', 'oszczednosci', 'wiecej']; // kolejność z dolnego paska
+// Ekrany otwierane z menu kafelkowego "Więcej". Gdy któryś z nich jest
+// aktywny, w pasku ma się podświetlać "Więcej" — inaczej pasek pokazywałby,
+// że nic nie jest wybrane.
+const MORE_TABS = ['poduszka', 'sklepy', 'przepisy', 'statystyki', 'faq', 'ustawienia', 'kurator'];
 
 function switchTab(name){
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.dataset.panel === name));
   document.querySelectorAll('.tab[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  // "Więcej" nie jest jedną z 6 głównych zakładek, ale gdy aktualny panel jest
-  // ukryty pod nim (np. FAQ), sam przycisk "Więcej" powinien wyglądać na
-  // aktywny — inaczej pasek zakładek pokazywałby, że NIC nie jest wybrane.
-  const moreBtn = document.getElementById('moreTabBtn');
-  if (moreBtn) moreBtn.classList.toggle('active', !MAIN_TABS.includes(name));
-  document.querySelectorAll('#moreTabMenu [data-tab]').forEach(item => item.classList.toggle('active', item.dataset.tab === name));
+  // Ekran otwarty z menu kafelkowego trzyma podświetloną zakładkę "Więcej".
+  if (MORE_TABS.includes(name)){
+    const moreTab = document.querySelector('.tab[data-tab="wiecej"]');
+    if (moreTab) moreTab.classList.add('active');
+  }
+  document.querySelectorAll('#moreMenuGrid [data-tab]').forEach(item => item.classList.toggle('active', item.dataset.tab === name));
+  if (name === 'statystyki') renderStatsPanel();
+  // Zakładka otwarta z menu zaczyna się od góry — inaczej po wejściu w
+  // Przepisy z połowy listy kafelków ekran zostawał przewinięty w dół.
+  if (MORE_TABS.includes(name) || MAIN_TABS.includes(name)) window.scrollTo(0, 0);
   // Zakładka "Sklepy" ma mapkę Leaflet — Leaflet nie wie, że jego kontener
   // zmienił rozmiar z 0 (display:none, kiedy zakładka była nieaktywna) na
   // pełny rozmiar karty, więc bez ponownego wywołania odświeżenia mapka
@@ -5798,29 +6040,10 @@ function switchTab(name){
 function bindEvents(){
   document.querySelectorAll('.tab[data-tab]').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
-  function closeMoreTabMenu(){
-    document.getElementById('moreTabMenu').hidden = true;
-    document.getElementById('moreTabBtn').setAttribute('aria-expanded', 'false');
-  }
-  document.getElementById('moreTabBtn').addEventListener('click', function(e){
-    e.stopPropagation();
-    const menu = document.getElementById('moreTabMenu');
-    menu.hidden = !menu.hidden;
-    this.setAttribute('aria-expanded', String(!menu.hidden));
-  });
-  document.getElementById('moreTabMenu').addEventListener('click', (e) => {
-    const item = e.target.closest('[data-tab]');
-    if (!item) return;
-    switchTab(item.getAttribute('data-tab'));
-    closeMoreTabMenu();
-  });
-  // Klik gdziekolwiek indziej zamyka menu — ten sam wzorzec co inne pływające
-  // panele (patrz np. #contactBubblePanel).
-  document.addEventListener('click', (e) => {
-    const menu = document.getElementById('moreTabMenu');
-    if (!menu.hidden && !menu.contains(e.target) && e.target.id !== 'moreTabBtn' && !document.getElementById('moreTabBtn').contains(e.target)){
-      closeMoreTabMenu();
-    }
+  document.getElementById('moreMenuGrid').addEventListener('click', (e) => {
+    const tile = e.target.closest('[data-tab]');
+    if (!tile) return;
+    switchTab(tile.getAttribute('data-tab'));
   });
 
   document.getElementById('savingsMiniInfoBtn').addEventListener('click', function(){
@@ -6154,6 +6377,23 @@ function bindEvents(){
   }
   document.getElementById('bufferTopup').addEventListener('click', () => addBufferEntry('topup'));
   document.getElementById('bufferExpense').addEventListener('click', () => addBufferEntry('expense'));
+
+  // Usuwanie pojedynczego wpisu z historii poduszki (prośba Dawida).
+  // Potwierdzenie, bo operacji nie da się cofnąć, a wpis bywa jedynym śladem
+  // po ręcznej decyzji sprzed tygodni.
+  document.getElementById('bufferHistory').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-buffer-delete]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-buffer-delete');
+    const entry = state.buffer.log.find(x => x.id === id);
+    if (!entry) return;
+    const label = entry.type === 'topup' ? 'wpłatę' : 'wydatek';
+    if (!confirm('Usunąć ' + label + ' ' + formatPLN(entry.amount) + (entry.note ? ' („' + entry.note + '”)' : '') +
+      ' z historii poduszki?\n\nSaldo przeliczy się od nowa. Tej operacji nie da się cofnąć.')) return;
+    state.buffer.log = state.buffer.log.filter(x => x.id !== id);
+    renderAll();
+    await persist('Usunięto wpis z historii poduszki.');
+  });
 
   document.getElementById('bufferRolloverKeep').addEventListener('click', async () => {
     state.meta.pendingBufferRollover = null;
@@ -7226,6 +7466,23 @@ if (!ADMIN_MODE){
   const curatorTabItem = document.getElementById('curatorTabItem');
   if (curatorTabItem) curatorTabItem.style.display = 'none';
 }
+
+/* Każdy ekran otwierany z menu kafelkowego dostaje na górze przycisk powrotu.
+   Dokładamy go z JS, żeby na pewno wyglądał i działał tak samo we wszystkich
+   sześciu (a przy dodaniu siódmego nie trzeba pamiętać o wklejeniu markupu). */
+function addBackToMoreButtons(){
+  for (const name of MORE_TABS){
+    const panel = document.querySelector('.panel[data-panel="' + name + '"]');
+    if (!panel || panel.querySelector('.back-to-more')) continue;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'back-to-more';
+    btn.textContent = '‹ Więcej';
+    btn.addEventListener('click', () => switchTab('wiecej'));
+    panel.insertBefore(btn, panel.firstChild);
+  }
+}
+addBackToMoreButtons();
 
 renderAll();
 switchTab('dzis');
