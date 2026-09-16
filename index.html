@@ -1307,8 +1307,8 @@ nav.tabbar{
            Sama liczba nie mówiła, że zawiera w sobie cel tygodniowy — stąd druga
            linijka z samą nadwyżką i to wyjaśnienie. -->
       <div class="info-box" id="savingsMiniInfoBox" hidden>
-        <strong>Cel na ten tydzień</strong> to Twój miesięczny cel oszczędności podzielony przez 4,33 (tyle średnio tygodni ma miesiąc). Ta kwota jest już odjęta od budżetu dziennego, więc odkładasz ją samym tym, że mieścisz się w dziennej kwocie.<br><br>
-        <strong>Odłożone w tym tygodniu</strong> to cel plus wszystko, czego w tym tygodniu nie wydałeś/aś ponad plan: dla każdego zapisanego dnia appka liczy budżet dnia minus wydatki i sumuje te różnice. Dzień bez zakupów liczy się jako 0 zł wydane, więc oddaje całą dzienną stawkę na plus.<br><br>
+        <strong>Cel na ten tydzień</strong> to suma dziennych udziałów w oszczędnościach z jego siedmiu dni. Każdy dzień wnosi miesięczny cel podzielony przez liczbę dni <em>tego</em> miesiąca — dokładnie ten sam dzielnik, z którego liczy się budżet dzienny. Dzięki temu trzymanie się dziennej kwoty przez 7 dni daje cel tygodniowy co do grosza, a tydzień na przełomie miesięcy sam miesza obie stawki.<br><br>
+        <strong>Odłożone w tym tygodniu</strong> narasta dzień po dniu: za każdy miniony dzień appka dolicza jego udział w celu, a do tego różnicę między budżetem dnia a wydatkami. Dzień bez zakupów liczy się jako 0 zł wydane, więc oddaje całą dzienną stawkę na plus. W poniedziałek zobaczysz więc ułamek celu, a nie cały tydzień z góry.<br><br>
         <strong>W tym dodatkowo ponad cel</strong> to sama ta nadwyżka — czyli ile udało Ci się odłożyć <em>poza</em> tym, co i tak było zaplanowane. Gdy wyjdzie na minus, znaczy to, że w tym tygodniu przekroczyłeś/aś budżet i część celu została nadszarpnięta.
       </div>
       <div id="savingsSummaryMini"></div>
@@ -1417,7 +1417,9 @@ nav.tabbar{
         <button type="button" class="info-btn" id="weeklyGoalInfoBtn" aria-expanded="false" aria-controls="weeklyGoalInfoBox" aria-label="Skąd bierze się cel tygodniowy?">?</button>
       </div>
       <div class="info-box" id="weeklyGoalInfoBox" hidden>
-        To Twój <strong>miesięczny cel oszczędności</strong> (z zakładki Budżet) podzielony przez <strong>4,33</strong> — tyle średnio tygodni ma miesiąc (52 tygodnie ÷ 12). Np. cel 500 zł/mies. → 500 ÷ 4,33 ≈ 115,47 zł/tydzień. Kwota "odłożone" w danym tygodniu to ten cel plus suma różnic (budżet dnia minus to, co wydałeś/aś) z dni zapisanych w zakładce Dziś w tym tygodniu — licz na to, że zmiana celu przeliczy też wcześniejsze tygodnie w historii, bo appka zawsze porównuje do aktualnego celu.
+        Twój <strong>miesięczny cel oszczędności</strong> (z zakładki Budżet) rozkłada się równo na dni miesiąca, a cel tygodnia to suma udziałów jego siedmiu dni. Np. cel 500 zł we wrześniu (30 dni) → 16,67 zł dziennie → <strong>116,67 zł/tydzień</strong>; w październiku (31 dni) wyjdzie 112,90 zł, a w lutym (28 dni) 125,00 zł.<br><br>
+        Cel tygodniowy różni się więc lekko między miesiącami — i tak ma być: to <em>ten sam</em> dzielnik, z którego liczy się budżet dzienny. Gdyby appka dzieliła przez stałe „4,33 tygodnia w miesiącu", obie liczby nigdy nie zeszłyby się co do grosza (w lutym rozjazd sięgał 8%).<br><br>
+        Kwota „odłożone" narasta w ciągu tygodnia: za każdy miniony dzień appka dolicza jego udział w celu plus różnicę (budżet dnia minus wydatki). Zmiana celu przeliczy też wcześniejsze tygodnie w historii, bo appka zawsze porównuje do aktualnego celu.
       </div>
       <div class="medal-row" id="medalRow"></div>
       <div class="pill neutral" id="streakPill" style="align-self:flex-start;">Passa: 0 tyg.</div>
@@ -1774,8 +1776,18 @@ nav.tabbar{
         <div class="faq-a" id="faqA4" hidden><p>Poduszka to pieniądze na nagłe, nieplanowane wydatki — leki, awaria, nieplanowany dojazd. Wydatek z poduszki nie obciąża dziennego budżetu, więc jeden pechowy dzień nie psuje całego miesiąca. Cel oszczędności to co innego: to kwota, której świadomie NIE wydajesz, żeby odłożyć ją na bok.</p></div>
       </div>
       <div class="faq-item">
-        <button type="button" class="faq-q" aria-expanded="false" data-faq="5"><span>Czy moje dane gdzieś wyciekają?</span><span class="faq-caret">▾</span></button>
-        <div class="faq-a" id="faqA5" hidden><p>Nie. Budżet, wydatki, cele i lista zakupów są zapisywane wyłącznie w pamięci przeglądarki na Twoim urządzeniu. Nie wysyłamy ich na żaden serwer. Do internetu appka sięga tylko po listę promocji i przepisy oraz — jeśli zgłosisz inną cenę — po wspólne zgłoszenia cen (bez żadnych danych osobowych).</p></div>
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="5"><span>Dlaczego cel tygodniowy nie jest co miesiąc taki sam?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA5" hidden><p>Bo miesiące mają różną liczbę dni. Twój miesięczny cel oszczędności rozkłada się równo na dni miesiąca, a cel tygodnia to suma udziałów jego siedmiu dni. Przy celu 500 zł wyjdzie 116,67 zł w 30-dniowym wrześniu, 112,90 zł w 31-dniowym październiku i 125,00 zł w 28-dniowym lutym.</p>
+        <p>To celowe: budżet dzienny dzieli przez dokładnie ten sam dzielnik, więc trzymanie się dziennej kwoty przez siedem dni daje cel tygodniowy <strong>co do grosza</strong>. Wcześniej appka dzieliła cel przez stałe „4,33 tygodnia w miesiącu” i obie liczby nigdy się nie zgadzały — w lutym rozjeżdżały się o 8%. Tydzień na przełomie miesięcy miesza teraz obie stawki sam z siebie, dzień po dniu.</p></div>
+      </div>
+      <div class="faq-item">
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="6"><span>Dlaczego „odłożone w tym tygodniu” rośnie powoli, dzień po dniu?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA6" hidden><p>Bo tyle realnie odłożyłeś/aś do tej pory. Za każdy miniony dzień appka dolicza jego udział w celu plus różnicę między budżetem dnia a wydatkami. W poniedziałek zobaczysz więc mniej więcej jedną siódmą celu, a nie cały tydzień z góry.</p>
+        <p>Wcześniej było odwrotnie: pełny cel tygodniowy doliczał się od razu w poniedziałek, przez co po jednym dniu z siedmiu appka potrafiła przyznać odznakę „Cel osiągnięty”. Teraz odznaka może wpaść dopiero po realnie przepracowanym tygodniu. Tygodnie niepełne — ten, który właśnie trwa, i pierwszy w historii, jeśli zacząłeś/aś wpisywać w środku tygodnia — mają w historii dopisek <em>(x z 7 dni)</em>.</p></div>
+      </div>
+      <div class="faq-item">
+        <button type="button" class="faq-q" aria-expanded="false" data-faq="7"><span>Czy moje dane gdzieś wyciekają?</span><span class="faq-caret">▾</span></button>
+        <div class="faq-a" id="faqA7" hidden><p>Nie. Budżet, wydatki, cele i lista zakupów są zapisywane wyłącznie w pamięci przeglądarki na Twoim urządzeniu. Nie wysyłamy ich na żaden serwer. Do internetu appka sięga tylko po listę promocji i przepisy oraz — jeśli zgłosisz inną cenę — po wspólne zgłoszenia cen (bez żadnych danych osobowych).</p></div>
       </div>
       </div>
     </div>
@@ -2070,6 +2082,10 @@ const STREAK_BADGES = [
 const MONTH_NAMES_NOM_PL = ['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
 
 const POLISH_MONTHS = ['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+/* Trzyliterowe skróty — pod słupkami projekcji oszczędności. Wcześniej były tam
+   etykiety "M1...M6"; odkąd każdy słupek to konkretny miesiąc kalendarzowy z
+   jego realną liczbą dni, nazwa miesiąca niesie tę informację wprost. */
+const POLISH_MONTHS_SHORT = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paź','lis','gru'];
 
 /* Kategorie produktów spożywczych/chemii — używane przy imporcie promocji
    i przy budowaniu koszyka dopasowanego do budżetu (jeden produkt z każdej
@@ -2273,7 +2289,7 @@ let priceReportsCache = [];
    każdy i tak mógłby je sobie zmienić przez konsolę przeglądarki), to
    tylko sposób, żeby zwykli użytkownicy nie trafili na tę sekcję przez
    przypadek. */
-const APP_VERSION = '2026-09-16 · 16'; // bump przy każdym wydaniu pliku
+const APP_VERSION = '2026-09-16 · 17'; // bump przy każdym wydaniu pliku
 const ADMIN_MODE = /(^|[?&])admin=1(&|$)/.test(location.search);
 
 let currentFilter = '';
@@ -2964,8 +2980,53 @@ function ensureBufferAccrualForCurrentMonth(){
   return true;
 }
 
+/* ---------------- CEL TYGODNIOWY ----------------
+   Zgłoszenie Dawida: budżet dzienny dzielił miesięczny cel przez REALNE dni
+   miesiąca (28/30/31), a cel tygodniowy przez stałe 4,33 tygodnia (= 30,33
+   dnia). Te dwie liczby nigdy nie schodziły się co do grosza, a w lutym
+   rozjeżdżały się o 8% (przy celu 500 zł: 115,47 zł wg 4,33 zamiast
+   125,00 zł wg realnych dni). Co gorsza znak błędu zmieniał się z miesiąca na
+   miesiąc, więc pomyłki nie kasowały się nawzajem w dłuższej historii.
+
+   Rozwiązanie (wybrana opcja 1): cel tygodniowy przestaje być stałą liczbą.
+   Każdy DZIEŃ wnosi swój udział w oszczędnościach — cel miesięczny podzielony
+   przez liczbę dni TEGO miesiąca — a cel tygodnia to suma udziałów jego dni.
+   Dzięki temu zdanie, które appka obiecuje użytkownikowi ("trzymaj się dziennej
+   kwoty przez 7 dni, a masz cel tygodniowy"), jest DOSŁOWNIE prawdziwe, bo obie
+   liczby liczą się z dokładnie tego samego dzielnika co budżet dzienny
+   (patrz computeBudget: totalForSpending / dim).
+
+   Efekt uboczny, który jest zaletą: tydzień na przełomie miesięcy sam z siebie
+   miesza obie stawki, dzień po dniu, bez żadnego zaokrąglania ani wyjątku. */
+
+/* Udział jednego dnia w miesięcznym celu oszczędności. */
+function dailySavingsShareForDate(dateKey){
+  const goal = state.budget.savingsGoal || 0;
+  if (goal <= 0) return 0;
+  const [y, m] = dateKey.split('-').map(Number);
+  const dim = daysInMonth(y, m - 1);
+  return dim > 0 ? goal / dim : 0;
+}
+
+/* Wszystkie siedem dni tygodnia ISO, do którego należy podana data. */
+function datesOfIsoWeek(dateKey){
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const shift = (dt.getDay() + 6) % 7; // poniedziałek = 0
+  const monday = dateKeyAddDays(dateKey, -shift);
+  const out = [];
+  for (let i = 0; i < 7; i++) out.push(dateKeyAddDays(monday, i));
+  return out;
+}
+
+/* Pełny cel tygodnia, w którym leży podana data (suma udziałów 7 dni). */
+function weeklyTargetForDate(dateKey){
+  return datesOfIsoWeek(dateKey).reduce((s, d) => s + dailySavingsShareForDate(d), 0);
+}
+
+/* Cel BIEŻĄCEGO tygodnia — to jest liczba pokazywana jako "Aktualny cel". */
 function weeklyTarget(){
-  return (state.budget.savingsGoal || 0) / 4.33 * 1; // ~4.33 tygodnia w miesiącu
+  return weeklyTargetForDate(todayDateKey());
 }
 function weeklyTargetRounded(){
   const wt = weeklyTarget();
@@ -2976,9 +3037,9 @@ function weeklyTargetRounded(){
    Zamiast ręcznie wpisywać "ile zaoszczędziłem", użytkownik wpisuje "ile dziś wydałem".
    Różnica (budżet dnia − wydane) sumuje się i przechodzi na kolejne dni w tym samym
    miesiącu — przekroczenie budżetu jednego dnia obniża dostępną kwotę na kolejny dzień,
-   a niewykorzystana część ją podnosi. Cel tygodniowy jest już wliczony w budżet dzienny
-   (patrz computeBudget), więc "zaoszczędzone w tygodniu" = cel tygodniowy + suma różnic
-   z tego tygodnia. */
+   a niewykorzystana część ją podnosi. Cel oszczędności jest już wliczony w budżet dzienny
+   (patrz computeBudget), więc "zaoszczędzone w tygodniu" = udziały MINIONYCH dni tego
+   tygodnia w celu + suma różnic z tych dni (patrz weeklyTarget i derivedWeeklySavings). */
 
 /* Pole "ile_szt_promo" akceptuje zarówno samą liczbę ("2"), jak i opis
    własnymi słowami ("przy zakupie 2", "2 szt. w promocji") — appka i tak
@@ -4303,19 +4364,39 @@ function derivedWeeklySavings(){
     const rate = baseDailyAllowanceForDate(d);
     if (!Number.isFinite(rate)) continue; // miniony miesiąc bez wpisów — nie wiadomo
     const wk = isoWeekKeyFromDateStr(d);
-    if (!groups[wk]) groups[wk] = { weekLabel: wk, sumDiff: 0, lastTs: 0 };
+    if (!groups[wk]) groups[wk] = { weekLabel: wk, sumDiff: 0, sumShare: 0, anyDate: d, days: 0, lastTs: 0 };
     const items = dailySpendItemsForDate(d);
     groups[wk].sumDiff += (rate - dailySpendTotalForDate(d));
+    // Udział W OSZCZĘDNOŚCIACH narasta dzień po dniu, a nie skokiem w
+    // poniedziałek. Wcześniej do każdego tygodnia — również takiego, z którego
+    // minął dopiero JEDEN dzień — doliczany był PEŁNY cel tygodniowy. Skutek
+    // był widoczny gołym okiem: w poniedziałek, po wydaniu dokładnie dziennej
+    // kwoty, appka pokazywała cały cel jako "odłożone" i przyznawała odznakę
+    // "Cel osiągnięty" za jeden dzień z siedmiu.
+    groups[wk].sumShare += dailySavingsShareForDate(d);
+    groups[wk].days++;
     if (items.length) groups[wk].lastTs = Math.max(groups[wk].lastTs, ...items.map(e => e.ts));
   }
-  const target = weeklyTargetRounded();
   return Object.values(groups)
-    .map(g => ({
-      weekLabel: g.weekLabel,
-      amount: Math.round((target + g.sumDiff) * 100) / 100,
-      targetSnapshot: target,
-      ts: g.lastTs
-    }))
+    .map(g => {
+      // Mianownik to zawsze PEŁNY tydzień (7 dni), nawet jeśli policzonych dni
+      // jest mniej. Dzięki temu w trakcie tygodnia stosunek narasta od 0 do 1 i
+      // odznaka może wpaść dopiero po realnie przepracowanym tygodniu.
+      const target = Math.round(weeklyTargetForDate(g.anyDate) * 100) / 100;
+      return {
+        weekLabel: g.weekLabel,
+        amount: Math.round((g.sumShare + g.sumDiff) * 100) / 100,
+        // Nadwyżka PONAD plan, czyli sama suma różnic (budżet dnia − wydatki).
+        // Liczona osobno, bo "odłożone minus cel tygodnia" dawałoby w trakcie
+        // tygodnia wielkiego minusa nawet przy idealnym trzymaniu się budżetu:
+        // w poniedziałek naliczony jest 1 dzień celu, a cel tygodnia to 7 dni.
+        extra: Math.round(g.sumDiff * 100) / 100,
+        targetSnapshot: target,
+        countedDays: g.days,
+        partial: g.days < 7,
+        ts: g.lastTs
+      };
+    })
     .sort((a, b) => a.weekLabel.localeCompare(b.weekLabel));
 }
 
@@ -4324,12 +4405,27 @@ function tierForRatio(ratio){
   for (const t of MEDAL_TIERS) if (ratio >= t.min) best = t;
   return best;
 }
+function weekRatio(entry){
+  return entry.targetSnapshot > 0 ? entry.amount / entry.targetSnapshot : (entry.amount > 0 ? 999 : 0);
+}
+
+/* Odznaki przyznajemy WYŁĄCZNIE za tygodnie przepracowane w całości.
+   Powód: dopóki tydzień trwa, "odłożone" zawiera niewydaną jeszcze część
+   dzisiejszego dnia — w poniedziałek w południe, zanim cokolwiek kupisz,
+   wychodzi z tego więcej niż cały tygodniowy cel i appka przyznawała złoto
+   za dzień, który się jeszcze nie skończył. Tygodnie niepełne dalej widać w
+   historii z kwotą i dopiskiem "(x z 7 dni)", tylko bez medalu. */
+function isCompleteWeek(entry){
+  return !entry.partial;
+}
+
 function unlockedTierIds(){
   // A week that reaches gold also cleared silver and bronze along the way —
   // collect every threshold met, not just the single best one for that week.
   const ids = new Set();
   for (const entry of derivedWeeklySavings()){
-    const ratio = entry.targetSnapshot > 0 ? entry.amount / entry.targetSnapshot : (entry.amount > 0 ? 999 : 0);
+    if (!isCompleteWeek(entry)) continue;
+    const ratio = weekRatio(entry);
     for (const t of MEDAL_TIERS) if (ratio >= t.min) ids.add(t.id);
   }
   return ids;
@@ -4339,8 +4435,11 @@ function currentStreak(){
   let streak = 0;
   for (let i = log.length - 1; i >= 0; i--){
     const e = log[i];
-    const ratio = e.targetSnapshot > 0 ? e.amount / e.targetSnapshot : (e.amount > 0 ? 999 : 0);
-    if (ratio >= 1) streak++; else break;
+    // Trwający tydzień POMIJAMY, zamiast przerywać na nim passę — inaczej
+    // licznik spadałby do zera w każdy poniedziałek i wracał dopiero w
+    // niedzielę, mimo że użytkownik niczego nie zepsuł.
+    if (!isCompleteWeek(e)) continue;
+    if (weekRatio(e) >= 1) streak++; else break;
   }
   return streak;
 }
@@ -5188,14 +5287,19 @@ function renderSavingsSummaryMini(){
   const streak = currentStreak();
   let body = '<div class="list-row"><span class="name">Cel na ten tydzień</span><span class="amount">' + formatPLN(target) + '</span></div>';
   if (entry){
-    const ratio = target > 0 ? entry.amount/target : 1;
-    const tier = tierForRatio(ratio);
+    // Medal dopiero za tydzień domknięty (patrz isCompleteWeek) — w trakcie
+    // tygodnia sygnałem "jak mi idzie" jest linijka "dodatkowo ponad cel"
+    // niżej, która porównuje się do planu na dni, które już minęły.
+    const tier = isCompleteWeek(entry) ? tierForRatio(weekRatio(entry)) : null;
     body += '<div class="list-row"><span class="name">Odłożone w tym tygodniu</span><span class="amount">' + formatPLN(entry.amount) + (tier ? ' ' + tier.icon : '') + '</span></div>';
     // Druga linijka: sama nadwyżka ponad cel. Dawid pytał "skąd wzięło się
     // 335,98 zł?" — bo pierwsza kwota zawiera w sobie cel tygodniowy i bez
     // rozbicia nie da się tego wyczytać. "Dodatkowo" znaczy tu naprawdę
     // dodatkowo: to, co zostało PONAD plan (na minusie — czego zabrakło).
-    const extra = entry.amount - target;
+    // Bierzemy gotowe entry.extra, a NIE "odłożone minus cel tygodnia" —
+    // patrz komentarz przy derivedWeeklySavings: w środku tygodnia ta druga
+    // formuła pokazywałaby duży minus mimo idealnego trzymania się budżetu.
+    const extra = entry.extra;
     body += '<div class="list-row"><span class="name">W tym dodatkowo ponad cel</span><span class="amount ' +
       (extra >= 0 ? 'good' : 'warn') + '">' + (extra >= 0 ? '+' : '−') + formatPLN(Math.abs(extra)) + '</span></div>';
   } else {
@@ -5547,9 +5651,15 @@ function renderSavingsPanel(){
     hist.innerHTML = '<div class="empty-state">Brak wpisów — wpisuj codziennie w zakładce <strong>Dziś</strong>, ile wydałeś/aś.</div>';
   } else {
     hist.innerHTML = log.map(e => {
-      const ratio = e.targetSnapshot > 0 ? e.amount / e.targetSnapshot : (e.amount > 0 ? 999 : 0);
-      const tier = tierForRatio(ratio);
-      return '<div class="savings-entry"><span>' + e.weekLabel + '</span><span class="mono">' + formatPLN(e.amount) + '</span><span>' + (tier ? tier.icon : '—') + '</span></div>';
+      const tier = isCompleteWeek(e) ? tierForRatio(weekRatio(e)) : null;
+      // Tydzień niepełny to albo ten, który właśnie trwa, albo pierwszy w
+      // historii (ktoś zaczął wpisywać np. w piątek). Bez tej adnotacji taki
+      // tydzień wyglądałby na słabszy niż jest — porównuje się do celu z
+      // PEŁNYCH siedmiu dni, a przepracował ich mniej.
+      const note = e.partial
+        ? ' <span class="hint">(' + e.countedDays + ' z 7 dni)</span>'
+        : '';
+      return '<div class="savings-entry"><span>' + e.weekLabel + note + '</span><span class="mono">' + formatPLN(e.amount) + '</span><span>' + (tier ? tier.icon : '—') + '</span></div>';
     }).join('');
   }
 
@@ -5625,21 +5735,41 @@ function renderProjectionChart(){
   const wrap = document.getElementById('projectionChart');
   const caption = document.getElementById('projectionCaption');
   const log = derivedWeeklySavings();
-  const avg = log.length
-    ? log.reduce((s,e) => s + e.amount, 0) / log.length
-    : weeklyTarget();
-  if (avg <= 0){
+  // Tempo liczymy NA DZIEŃ, a nie "średnia z tygodni". Powód: tygodnie bywają
+  // niepełne (pierwszy tydzień w historii, bieżący tydzień w trakcie), a średnia
+  // arytmetyczna z tygodni traktowałaby tydzień dwudniowy tak samo jak
+  // siedmiodniowy i zaniżała wynik. Suma podzielona przez liczbę policzonych
+  // dni jest odporna na to z definicji.
+  const totalDays = log.reduce((s, e) => s + e.countedDays, 0);
+  const avgDaily = totalDays > 0
+    ? log.reduce((s, e) => s + e.amount, 0) / totalDays
+    : (state.budget.savingsGoal || 0) / daysInMonth(new Date().getFullYear(), new Date().getMonth());
+  if (avgDaily <= 0){
     wrap.innerHTML = '';
     caption.textContent = 'Dodaj cel oszczędności lub pierwszy wpis, żeby zobaczyć projekcję.';
     return;
   }
-  const perMonth = avg * 4.33;
-  const cumulative = [1,2,3,4,5,6].map(m => perMonth * m);
+  // Każdy słupek to KONKRETNY nadchodzący miesiąc kalendarzowy, z jego realną
+  // liczbą dni — nie "uśredniony miesiąc" z 4,33 tygodnia. To ta sama zasada,
+  // co przy celu tygodniowym: jeden dzielnik dla całej appki, czyli realne dni.
+  const now = new Date();
+  const cumulative = [];
+  let running = 0;
+  const labels = [];
+  for (let i = 1; i <= 6; i++){
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    running += avgDaily * daysInMonth(d.getFullYear(), d.getMonth());
+    cumulative.push(running);
+    labels.push(POLISH_MONTHS_SHORT[d.getMonth()]);
+  }
   const max = cumulative[cumulative.length - 1];
   wrap.innerHTML = cumulative.map((v,i) =>
-    '<div class="chart-bar"><div class="bar" style="height:' + Math.max(6, (v/max*100)) + '%"></div><div class="lbl">M' + (i+1) + '</div></div>'
+    '<div class="chart-bar"><div class="bar" style="height:' + Math.max(6, (v/max*100)) + '%"></div><div class="lbl">' + labels[i] + '</div></div>'
   ).join('');
-  const basis = log.length ? 'obecnym tempie (' + formatPLN(avg) + '/tydz.)' : 'Twoim celu (' + formatPLN(avg) + '/tydz.)';
+  const avgWeekly = avgDaily * 7;
+  const basis = totalDays > 0
+    ? 'obecnym tempie (' + formatPLN(avgWeekly) + '/tydz.)'
+    : 'Twoim celu (' + formatPLN(avgWeekly) + '/tydz.)';
   caption.textContent = 'Przy ' + basis + ' za 6 miesięcy odłożysz ok. ' + formatPLN(max) + '.';
 }
 
