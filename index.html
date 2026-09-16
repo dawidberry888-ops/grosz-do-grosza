@@ -326,10 +326,25 @@ button{font-family:inherit;}
 .field{display:flex; flex-direction:column; gap:6px;}
 .field label{font-size:0.75rem; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;}
 /* Wspólny wygląd WSZYSTKICH pól (nie tylko tych w .field) — każdy layout
-   nadpisuje go po swojemu w sekcji LAYOUTY. */
+   nadpisuje go po swojemu w sekcji LAYOUTY.
+
+   UWAGA co do font-size: to MUSI być co najmniej 16px (1rem przy html{font-size:16px}).
+   Zgłoszenie Dawida: "kiedy klikam w okno kwota, przybliża mi się nieco ekran,
+   wpisuję kwotę, klikam zapisz i okno aplikacji pozostaje powiększone cały
+   czas". To nie jest błąd appki, tylko wbudowane zachowanie Safari na iOS:
+   gdy kliknięte pole ma tekst MNIEJSZY niż 16px, system sam przybliża stronę,
+   żeby dało się czytać to, co się wpisuje — i po wyjściu z pola NIE cofa tego
+   przybliżenia. Efekt uboczny: powiększona strona jest szersza niż ekran, więc
+   daje się przesuwać w bok (to samo "pływanie" prawo-lewo, o którym pisał).
+   Pole miało 0.9375rem = 15px, czyli o jeden piksel za mało.
+
+   Dlatego NIE używamy tu popularnej "łatki" maximum-scale=1/user-scalable=no w
+   metatagu viewport — ona owszem, blokuje to przybliżanie, ale przy okazji
+   odbiera możliwość ręcznego powiększenia strony komukolwiek, kto gorzej widzi.
+   Wystarczające 16px rozwiązuje problem u źródła i nikomu nic nie zabiera. */
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]), textarea, select{
   font-family:var(--font-mono);
-  font-size:0.9375rem;
+  font-size:1rem;
   padding:10px 12px;
   border-radius:var(--radius-sm);
   border:1px solid var(--line);
@@ -416,12 +431,21 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
   padding:9px 0; border-bottom:1px dashed var(--line);
 }
 .preset-row:last-child{border-bottom:none;}
+/* Wiersz wyboru opisów do połączenia (Statystyki -> "Na co najczęściej").
+   min-width:0 na nazwie jest tu konieczne: bez niego długi opis rozpycha
+   flexa poza szerokość ekranu (ta sama pułapka co przy .row, patrz niżej). */
+.merge-note-row{display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); cursor:pointer;}
+.merge-note-row:last-child{border-bottom:none;}
+.merge-note-row input[type="checkbox"]{flex:none; width:18px; height:18px;}
+.merge-note-row .name{flex:1 1 auto; min-width:0; font-size:0.875rem; overflow-wrap:anywhere;}
+.merge-note-row .mono{flex:none; white-space:nowrap;}
 .preset-row .name{font-size:0.84375rem; flex:1;}
 .preset-row input{
   font-family:var(--font-mono);
   width:96px; flex:none; text-align:right;
   padding:7px 10px; border-radius:9px; border:1px solid var(--line);
-  background:var(--paper); color:var(--ink); font-size:0.875rem;
+  background:var(--paper); color:var(--ink);
+  font-size:1rem; /* 16px — patrz komentarz przy wspólnej regule pól wyżej (iOS) */
 }
 
 /* pills / badges */
@@ -469,6 +493,11 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
    opis musi móc się zwężać, a kwota i przycisk zostać w całości. */
 .savings-entry > span:first-child{flex:1; min-width:0;}
 .savings-entry .excl-btn{margin-top:0; margin-left:8px; flex:none;}
+/* Historia trofeów: nazwa i opis to dwa DŁUGIE teksty, nie "etykieta + kwota".
+   Obok siebie w poziomym flexie ściskały się nawzajem (nazwa potrafiła zwęzić
+   się do jednej litery na wiersz), więc ten wiersz układamy w pionie. */
+.savings-entry.trophy-hist-row{flex-direction:column; align-items:flex-start; gap:2px;}
+.savings-entry.trophy-hist-row > span{flex:none; min-width:0; max-width:100%; overflow-wrap:anywhere;}
 
 /* store card */
 .store-card{
@@ -477,7 +506,11 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
 .store-card .head{display:flex; justify-content:space-between; align-items:center;}
 .store-card .head .name{font-weight:600; font-size:0.875rem;}
 .store-card .dist{font-family:var(--font-mono); font-size:0.75rem; color:var(--ink-soft);}
+.store-card .addr{font-size:0.78125rem; color:var(--ink-soft); overflow-wrap:anywhere;}
 .store-card .source{font-size:0.71875rem; color:var(--ink-faint);}
+/* Adres w dymku na mapie — Leaflet renderuje treść dymka poza naszą kartą,
+   więc styl musi być globalny, nie zagnieżdżony w .store-card. */
+.map-popup-addr{color:#555; font-size:0.78125rem;}
 .store-card .actions{display:flex; gap:8px;}
 
 /* product groups */
@@ -501,7 +534,7 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
    naraz (patrz ingredientChoiceKey/renderRecipesPanel) — osobna linia nad
    resztą wiersza produktu, jak inne linie .product-row (flex-basis:100%). */
 .product-row .ingredient-pick{flex-basis:100%; margin:2px 0;}
-.product-row .ingredient-pick select{width:100%; font-family:var(--font-mono); font-size:0.75rem; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink);}
+.product-row .ingredient-pick select{width:100%; font-family:var(--font-mono); font-size:1rem; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink);}
 
 /* karty przepisów (zakładka Przepisy) — patrz renderRecipesPanel */
 .recipe-card{border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;}
@@ -667,9 +700,11 @@ button.btn-sm{padding:7px 10px; font-size:0.75rem; border-radius:calc(var(--radi
 .preport{flex-basis:100%; display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px; font-size:0.71875rem; color:var(--ink-faint);}
 .preport-form{flex-basis:100%; display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px;}
 .preport-input{
-  font-family:var(--font-mono); font-size:0.8125rem; padding:6px 8px;
+  /* 16px — patrz komentarz przy wspólnej regule pól wyżej (iOS samo przybliża
+     stronę przy mniejszym tekście i już jej nie oddala). */
+  font-family:var(--font-mono); font-size:1rem; padding:6px 8px;
   border-radius:8px; border:1px solid var(--line); background:var(--paper);
-  color:var(--ink); width:88px;
+  color:var(--ink); width:100px; max-width:100%;
 }
 .preport-input-wide{width:100%; flex-basis:100%; font-family:var(--font-body);}
 .list-toggle-wrap{flex-basis:100%; margin-top:4px;}
@@ -1792,6 +1827,23 @@ nav.tabbar{
     <div class="card">
       <h2>Na co najczęściej<span class="sub">Zliczone po opisie wpisu — dlatego warto je wypełniać</span></h2>
       <div id="statsTopNotes"></div>
+      <!-- Zgłoszenie Dawida: "wpisując w wydatkach Pani Natasza masaż, a potem
+           w inny dzień Masaż Pani Natasza, nie zlicza mi to do jednego kosztu,
+           tylko pójdzie jako dwa różne wydatki. Może by tak mieć możliwość
+           łączenia niektórych kosztów w jeden?".
+           Świadomie NIE zgadujemy podobieństwa nazw automatycznie: "Masaż
+           Nataszy" i "Masaż Ani" różnią się jednym słowem, a to dwa zupełnie
+           różne wydatki. Decyzję podejmuje użytkownik, a appka ją zapamiętuje
+           (state.noteMerges) i stosuje przy każdym kolejnym zliczaniu — w tym
+           do wpisów, które dopiero powstaną. -->
+      <button type="button" class="btn btn-ghost btn-block" id="toggleNoteMerge" aria-expanded="false" aria-controls="noteMergeBox" style="margin-top:8px;">Połącz koszty ▾</button>
+      <div id="noteMergeBox" hidden style="flex-direction:column; gap:10px; margin-top:6px;">
+        <div class="hint">Zaznacz opisy, które znaczą to samo, wpisz jedną wspólną nazwę i kliknij „Połącz zaznaczone”. Twoje wpisy zostają nietknięte — zmienia się tylko sposób ich zliczania w statystykach.</div>
+        <div id="noteMergeList"></div>
+        <div class="field"><input id="noteMergeName" type="text" placeholder="Wspólna nazwa, np. Masaż"></div>
+        <button type="button" class="btn btn-primary btn-block" id="noteMergeApply">Połącz zaznaczone</button>
+        <div id="noteMergeExisting"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -1937,6 +1989,14 @@ const DEFAULT_STATE = {
                         // `fromDate` do końca tego miesiąca — dni już minione zostają nietknięte.
                         // Zasilenia z pieniędzy SPOZA budżetu (premia, zwrot, oszczędności) nic tu
                         // nie dopisują, bo nie mają prawa obniżać dziennej kwoty.
+  noteMerges: [], // [{ id, label:'Masaż', keys:['pani natasza masaz', 'masaz pani natasza'] }]
+                  // Ręcznie połączone opisy wydatków w statystykach ("Na co najczęściej").
+                  // Zgłoszenie Dawida: "Pani Natasza masaż" i "Masaż Pani Natasza" liczyły się
+                  // jako dwa osobne koszty. `keys` to opisy przepuszczone przez normalizePL (bez
+                  // polskich znaków, małymi literami), więc połączenie działa też dla wpisów,
+                  // które dopiero powstaną — i dla drobnych różnic w wielkości liter czy ogonkach.
+                  // Same wpisy w dailySpend.log zostają NIETKNIĘTE: to warstwa wyłącznie
+                  // prezentacyjna, którą da się w każdej chwili cofnąć bez utraty danych.
   globalRecipeExclusions: [], // znormalizowane NAZWY produktów, które nie mają czego szukać w ŻADNYM przepisie
                         // (karma dla psów, płyn do prania, ręczniki papierowe). Zgłoszenie Dawida przy pracy
                         // nad ekranem Kurator: wykluczanie takiego produktu osobno w każdym przepisie to
@@ -2213,7 +2273,7 @@ let priceReportsCache = [];
    każdy i tak mógłby je sobie zmienić przez konsolę przeglądarki), to
    tylko sposób, żeby zwykli użytkownicy nie trafili na tę sekcję przez
    przypadek. */
-const APP_VERSION = '2026-09-09 · 15'; // bump przy każdym wydaniu pliku
+const APP_VERSION = '2026-09-16 · 16'; // bump przy każdym wydaniu pliku
 const ADMIN_MODE = /(^|[?&])admin=1(&|$)/.test(location.search);
 
 let currentFilter = '';
@@ -2628,7 +2688,11 @@ async function fetchNearbyStoresFromOSM(lat, lng, radiusKm){
     const dedupKey = p.id || (chain + '|' + p.lat.toFixed(5) + '|' + p.lng.toFixed(5));
     if (seenIds.has(dedupKey)) continue;
     seenIds.add(dedupKey);
-    results.push({ id: uid(), name: chain, lat: p.lat, lng: p.lng, source: 'osm' });
+    // `address` bywa puste — nie każdy punkt w OpenStreetMap ma wpisany adres,
+    // a starsze wyszukiwania (sprzed tej zmiany) zapisały sklepy zupełnie bez
+    // tego pola. Wszędzie, gdzie adres się pokazuje, musi więc być opcjonalny.
+    results.push({ id: uid(), name: chain, lat: p.lat, lng: p.lng, source: 'osm',
+      address: (p.address || '').trim() || null });
   }
   return results;
 }
@@ -5451,8 +5515,12 @@ function renderTrophyCabinet(){
     return;
   }
   const visible = entries.slice(0, trophyHistoryVisibleCount);
+  // Wiersz trofeum to nagłówek + OPIS, a nie "etykieta i kwota" — dlatego ma
+  // własną klasę układającą go w pionie. W .savings-entry (poziomy flex) oba
+  // długie teksty walczyły o tę samą szerokość i przy węższym ekranie nazwa
+  // trofeum ściskała się do jednej litery na wiersz.
   const rows = visible.map(e =>
-    '<div class="savings-entry"><span>' + e.icon + ' ' + escapeHtml(e.label) + '</span><span class="hint">' + escapeHtml(e.desc) + '</span></div>'
+    '<div class="savings-entry trophy-hist-row"><span>' + e.icon + ' ' + escapeHtml(e.label) + '</span><span class="hint">' + escapeHtml(e.desc) + '</span></div>'
   ).join('');
   const loadMoreBtn = entries.length > visible.length
     ? '<button type="button" class="btn btn-ghost btn-sm btn-block" data-trophy-loadmore="1">Wczytaj więcej (' + (entries.length - visible.length) + ')</button>'
@@ -5490,15 +5558,36 @@ function renderSavingsPanel(){
 }
 
 /* Podgląd ostatnich dziennych wpisów — sam zapis odbywa się na zakładce Dziś,
-   tu tylko pokazujemy, skąd bierze się tygodniowy wynik powyżej. */
+   tu tylko pokazujemy, skąd bierze się tygodniowy wynik powyżej.
+
+   Zgłoszenie Dawida: "robi mi się bardzo długa lista, może zrobimy rozwijaną?
+   Niech będzie widoczne pierwsze 5 pozycji, potem za buttonem pokaż więcej
+   niech rozwijają się kolejne 5. Pytanie, jak długa historia jest tutaj
+   przewidziana? Bieżący miesiąc czy mogę tak rozwijać bez końca?".
+
+   Odpowiedź, którą utrwala ten kod: historia NIE jest przycięta do bieżącego
+   miesiąca ani do żadnej liczby dni — appka nigdy nie kasuje wpisów z
+   dailySpend.log, więc rozwijać można aż do pierwszego dnia, jaki kiedykolwiek
+   zapisałeś. Wcześniej lista i tak pokazywała tylko 10 ostatnich dni i reszta
+   była niedostępna; teraz dostępne jest wszystko, tylko po 5 na raz.
+   Na liście są dni, w których JEST jakiś wpis — dzień bez wpisu nie tworzy
+   tu pustego wiersza (w rozliczeniu budżetu liczy się i tak jako 0 zł,
+   patrz cumulativeAdjustmentBefore). */
+const DAILY_HISTORY_PAGE = 5;
+let dailySpendHistoryShown = DAILY_HISTORY_PAGE;
+
 function renderDailySpendHistory(){
   const el = document.getElementById('dailySpendHistory');
-  const dates = [...new Set(state.dailySpend.log.map(e => e.date))].sort((a,b) => b.localeCompare(a)).slice(0, 10);
-  if (!dates.length){
+  if (!el) return;
+  const all = [...new Set(state.dailySpend.log.map(e => e.date))].sort((a,b) => b.localeCompare(a));
+  if (!all.length){
     el.innerHTML = '<div class="empty-state">Brak wpisów. Wpisz w zakładce <strong>Dziś</strong>, ile dziś wydałeś/aś.</div>';
     return;
   }
-  el.innerHTML = dates.map(d => {
+  // Po usunięciu wpisów licznik mógłby zostać większy niż cała lista — wtedy
+  // przycisk zniknie sam, bo porównujemy go z realną długością listy.
+  const shown = Math.min(dailySpendHistoryShown, all.length);
+  const rows = all.slice(0, shown).map(d => {
     const actual = dailySpendTotalForDate(d);
     const allowance = dailySpendAllowanceForDate(d);
     const diff = allowance - actual;
@@ -5508,6 +5597,28 @@ function renderDailySpendHistory(){
     return '<div class="savings-entry"><span>' + dateLbl + ' — wydane ' + formatPLN(actual) + ' <span class="hint">(budżet ' + formatPLN(allowance) + ')</span></span>' +
       '<span class="mono pill ' + cls + '">' + sign + formatPLN(Math.abs(diff)) + '</span></div>';
   }).join('');
+
+  const left = all.length - shown;
+  let footer = '';
+  if (left > 0){
+    footer = '<button type="button" class="btn btn-ghost btn-block" id="dailyHistoryMore" style="margin-top:8px;">Pokaż więcej (jeszcze ' + left + ') ▾</button>';
+  } else if (shown > DAILY_HISTORY_PAGE){
+    footer = '<button type="button" class="btn btn-ghost btn-block" id="dailyHistoryLess" style="margin-top:8px;">Zwiń listę ▴</button>';
+  }
+  const counter = '<div class="hint" id="dailyHistoryCounter">Pokazane ' + shown + ' z ' + all.length +
+    (all.length === 1 ? ' dnia' : ' dni') + ' z wpisami. Historia sięga do pierwszego zapisanego dnia.</div>';
+  el.innerHTML = rows + footer + counter;
+
+  const more = document.getElementById('dailyHistoryMore');
+  if (more) more.addEventListener('click', () => {
+    dailySpendHistoryShown = shown + DAILY_HISTORY_PAGE;
+    renderDailySpendHistory();
+  });
+  const less = document.getElementById('dailyHistoryLess');
+  if (less) less.addEventListener('click', () => {
+    dailySpendHistoryShown = DAILY_HISTORY_PAGE;
+    renderDailySpendHistory();
+  });
 }
 
 function renderProjectionChart(){
@@ -5641,21 +5752,15 @@ function renderStatsPanel(){
     '</div>';
 
   // ---- Na co najczęściej ----
-  const notes = {};
-  for (const e of state.dailySpend.log){
-    const key = (e.note || '').trim();
-    if (!key) continue;
-    const k = normalizePL(key);
-    if (!notes[k]) notes[k] = { label: key, sum: 0, n: 0 };
-    notes[k].sum += e.amount;
-    notes[k].n++;
-  }
-  const top = Object.values(notes).sort((a, b) => b.sum - a.sum).slice(0, 5);
+  const grouped = groupedSpendNotes();
+  const top = grouped.slice(0, 5);
   document.getElementById('statsTopNotes').innerHTML = top.length
     ? top.map(t => '<div class="savings-entry"><span>' + escapeHtml(t.label) +
+        (t.merged ? ' <span class="hint">(połączone)</span>' : '') +
         ' <span class="hint">(' + t.n + (t.n === 1 ? ' raz' : ' razy') + ')</span></span>' +
         '<span class="mono">' + formatPLN(t.sum) + '</span></div>').join('')
     : '<div class="empty-state">Żaden wpis nie ma jeszcze opisu. Wpisuj „na co”, a appka pokaże, co zjada najwięcej.</div>';
+  renderNoteMergePanel();
 
   // ---- Rekordy ----
   const recs = [];
@@ -5673,6 +5778,117 @@ function renderStatsPanel(){
   const zeroDays = spentByDay.filter(d => d.spent === 0).length;
   recs.push(row('Dni bez żadnego wydatku', zeroDays + ' z ' + days.length, zeroDays > 0 ? 'good' : ''));
   document.getElementById('statsRecords').innerHTML = recs.join('');
+}
+
+/* ---------------- Łączenie kosztów ("Na co najczęściej") ----------------
+   Zgłoszenie Dawida: "Pani Natasza masaż" i "Masaż Pani Natasza" liczyły się
+   jako dwa osobne wydatki. Rozwiązanie: użytkownik sam wskazuje, które opisy
+   znaczą to samo, i podaje wspólną nazwę; appka zapamiętuje to w
+   state.noteMerges i stosuje przy każdym kolejnym zliczaniu.
+
+   Świadome decyzje projektowe:
+   * łączymy WYŁĄCZNIE na potrzeby statystyk — dailySpend.log zostaje
+     nietknięty, więc cofnięcie połączenia niczego nie niszczy i nie trzeba
+     go "odkręcać" wpis po wpisie,
+   * kluczem jest normalizePL(opis), nie sam tekst — dzięki temu połączenie
+     obejmuje też przyszłe wpisy i drobne różnice w ogonkach/wielkości liter,
+   * jeden opis może należeć tylko do JEDNEJ grupy (przy łączeniu wypisujemy
+     go z poprzedniej) — inaczej ta sama kwota policzyłaby się dwa razy. */
+
+/* Mapa: znormalizowany opis -> grupa, do której należy. */
+function noteMergeIndex(){
+  const idx = {};
+  for (const g of (state.noteMerges || [])){
+    if (!g || !Array.isArray(g.keys)) continue;
+    for (const k of g.keys) idx[k] = g;
+  }
+  return idx;
+}
+
+/* Wszystkie opisy wydatków zliczone razem, z uwzględnieniem połączeń.
+   Zwraca [{ key, label, sum, n, merged }] posortowane malejąco po kwocie. */
+function groupedSpendNotes(){
+  const idx = noteMergeIndex();
+  const out = {};
+  for (const e of state.dailySpend.log){
+    const raw = (e.note || '').trim();
+    if (!raw) continue;
+    const k = normalizePL(raw);
+    const g = idx[k];
+    const bucket = g ? 'merge:' + g.id : k;
+    if (!out[bucket]) out[bucket] = { key: bucket, label: g ? g.label : raw, sum: 0, n: 0, merged: !!g };
+    out[bucket].sum += e.amount;
+    out[bucket].n++;
+  }
+  return Object.values(out).sort((a, b) => b.sum - a.sum);
+}
+
+/* Pojedyncze, JESZCZE NIEPOŁĄCZONE opisy — tylko takie da się zaznaczyć do
+   połączenia. Opis wciągnięty już do grupy znika z listy wyboru, żeby nie dało
+   się przypisać go do dwóch grup naraz. */
+function mergeableSpendNotes(){
+  const idx = noteMergeIndex();
+  const out = {};
+  for (const e of state.dailySpend.log){
+    const raw = (e.note || '').trim();
+    if (!raw) continue;
+    const k = normalizePL(raw);
+    if (idx[k]) continue;
+    if (!out[k]) out[k] = { key: k, label: raw, sum: 0, n: 0 };
+    out[k].sum += e.amount;
+    out[k].n++;
+  }
+  return Object.values(out).sort((a, b) => b.sum - a.sum);
+}
+
+function renderNoteMergePanel(){
+  const listEl = document.getElementById('noteMergeList');
+  if (!listEl) return;
+  const items = mergeableSpendNotes();
+  listEl.innerHTML = items.length
+    ? items.map(it =>
+        '<label class="merge-note-row"><input type="checkbox" data-merge-key="' + escapeHtml(it.key) + '">' +
+        '<span class="name">' + escapeHtml(it.label) + '</span>' +
+        '<span class="mono hint">' + it.n + '× · ' + formatPLN(it.sum) + '</span></label>').join('')
+    : '<div class="hint">Brak pojedynczych opisów do połączenia.</div>';
+
+  const existEl = document.getElementById('noteMergeExisting');
+  const groups = state.noteMerges || [];
+  existEl.innerHTML = groups.length
+    ? '<div class="hint" style="margin-top:4px;">Już połączone:</div>' + groups.map(g =>
+        '<div class="savings-entry"><span><strong>' + escapeHtml(g.label) + '</strong> <span class="hint">← ' +
+        escapeHtml(g.keys.join(', ')) + '</span></span>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-merge-undo="' + escapeHtml(g.id) + '">Rozłącz</button></div>').join('')
+    : '';
+
+  existEl.querySelectorAll('[data-merge-undo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-merge-undo');
+      const g = (state.noteMerges || []).find(x => x.id === id);
+      state.noteMerges = (state.noteMerges || []).filter(x => x.id !== id);
+      persist();
+      renderStatsPanel();
+      showToast('Rozłączono „' + (g ? g.label : '') + '” — opisy znowu liczą się osobno.');
+    });
+  });
+}
+
+function applyNoteMerge(){
+  const keys = [...document.querySelectorAll('#noteMergeList [data-merge-key]:checked')]
+    .map(el => el.getAttribute('data-merge-key'));
+  if (keys.length < 2) return showToast('Zaznacz co najmniej dwa opisy do połączenia.');
+  const nameEl = document.getElementById('noteMergeName');
+  const label = (nameEl.value || '').trim();
+  if (!label) return showToast('Wpisz wspólną nazwę dla połączonych kosztów.');
+
+  state.noteMerges = state.noteMerges || [];
+  state.noteMerges.push({ id: uid(), label, keys });
+  persist();
+  nameEl.value = '';
+  renderStatsPanel();
+  const n = keys.length;
+  const word = (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'opisy' : 'opisów';
+  showToast('Połączono ' + n + ' ' + word + ' w „' + label + '”.');
 }
 
 /* Zasilenia poduszki opłacone z bieżącego budżetu, które dotyczą TEGO
@@ -5805,6 +6021,9 @@ function storeRowHtml(s, opts){
   return '<div class="store-card">' +
       '<div class="head"><span class="name">' + escapeHtml(s.name) + '</span>' +
       '<span class="dist">' + (s.dist != null ? s.dist.toFixed(1) + ' km' : '—') + '</span></div>' +
+      // Adres — ta sama prośba co przy dymku na mapie. Pole jest opcjonalne
+      // (sklepy dodane ręcznie i te znalezione przed tą zmianą go nie mają).
+      (s.address ? '<div class="addr">' + escapeHtml(s.address) + '</div>' : '') +
       (opts.manage ? '<div class="source">' + storeSourceLabel(s) + '</div>' : '') +
       '<div class="actions">' +
         '<a class="btn btn-ghost btn-sm" href="' + mapsUrl(s.lat, s.lng) + '" target="_blank" rel="noopener">Otwórz w Mapach</a>' +
@@ -5950,7 +6169,14 @@ function updateStoresMap(stores){
     L.circleMarker([s.lat, s.lng], {
       radius: 7, color: style.stroke, weight: style.fill === '#ffffff' ? 3 : 2, fillColor: style.fill, fillOpacity: 0.95
     }).bindPopup(
-      '<b>' + escapeHtml(s.name) + '</b>' + (s.dist != null ? '<br>' + s.dist.toFixed(1) + ' km' : '') +
+      // Prośba Dawida: "po kliknięciu w kółko pojawia mi się nazwa sklepu oraz
+      // odległość. Może powinien być też tam adres?". Adres pochodzi z
+      // wyszukiwania (patrz fetchNearbyStoresFromOSM) i bywa pusty — sklep
+      // dodany ręcznie albo znaleziony przed tą zmianą go nie ma, więc dymek
+      // musi wyglądać sensownie również bez niego.
+      '<b>' + escapeHtml(s.name) + '</b>' +
+      (s.address ? '<br><span class="map-popup-addr">' + escapeHtml(s.address) + '</span>' : '') +
+      (s.dist != null ? '<br>' + s.dist.toFixed(1) + ' km' : '') +
       '<br><a href="' + mapsUrl(s.lat, s.lng) + '" target="_blank" rel="noopener">Otwórz w Mapach</a>'
     ).addTo(storesMapLayer);
   });
@@ -6818,6 +7044,18 @@ function bindEvents(){
     this.setAttribute('aria-expanded', String(!box.hidden));
     this.textContent = box.hidden ? 'Pokaż dzisiejsze wydatki ▾' : 'Ukryj dzisiejsze wydatki ▴';
   });
+
+  // Łączenie kosztów w Statystykach — panel domyślnie schowany, żeby nie
+  // zaśmiecać ekranu komuś, kto nigdy nie będzie tego potrzebował.
+  document.getElementById('toggleNoteMerge').addEventListener('click', function(){
+    const box = document.getElementById('noteMergeBox');
+    box.hidden = !box.hidden;
+    box.style.display = box.hidden ? '' : 'flex';
+    this.setAttribute('aria-expanded', String(!box.hidden));
+    this.textContent = box.hidden ? 'Połącz koszty ▾' : 'Ukryj łączenie kosztów ▴';
+    if (!box.hidden) renderNoteMergePanel();
+  });
+  document.getElementById('noteMergeApply').addEventListener('click', applyNoteMerge);
 
   document.getElementById('togglePastSpend').addEventListener('click', function(){
     const box = document.getElementById('pastSpendBox');
